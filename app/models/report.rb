@@ -114,8 +114,23 @@ class Report < ApplicationRecord
       was_awaiting = awaiting_clarification?
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
-        update!(declarant_notified: false) unless was_awaiting
+        self.declarant_notified = false unless was_awaiting
+        update!(taken_in_charge: true)
       end
+    end
+  end
+
+  # From then on the declarant can no longer edit the report: the analyst works on a stable text. Any
+  # other staff action closes editing too. A second call changes nothing and leaves no second trail.
+  def take_charge!(analyst)
+    raise Report::NotAllowed, "only staff take a report in charge" unless analyst&.staff?
+
+    with_lock do
+      raise Report::InvalidTransition, "cannot take a #{status} report in charge" unless under_analysis?
+      next if taken_in_charge?
+
+      AccessLog.record!(user: analyst, report: self, action: "take_charge")
+      update!(taken_in_charge: true)
     end
   end
 

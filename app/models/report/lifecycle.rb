@@ -116,6 +116,7 @@ module Report::Lifecycle
 
       transition!(from: from, to: to) do
         AccessLog.record!(user: analyst, report: self, action: action)
+        self.taken_in_charge = true
         purge_after_decision!
       end
     end
@@ -133,6 +134,7 @@ module Report::Lifecycle
 
     # Everything that could point back to the author or quote them goes, in one transaction. Free-text
     # answers, clarifications and the extractor's excerpts go too: only coded answers are kept.
+    # taken_in_charge stays: it says nothing of the author, and every decided report was taken in charge.
     def purge_after_decision!
       narrative&.purge_raw!
       clarifications.destroy_all
