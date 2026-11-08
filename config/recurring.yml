@@ -16,6 +16,9 @@ production:
   cut_ownerships:
     class: CutOwnershipsJob
     schedule: every day at 3am
+  close_expired_edit_windows:
+    class: CloseExpiredEditWindowsJob
+    schedule: every day at 3am
   purge_expired_drafts:
     class: PurgeExpiredDraftsJob
     schedule: every day at 3am

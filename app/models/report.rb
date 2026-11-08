@@ -81,6 +81,11 @@ class Report < ApplicationRecord
     OpenSSL::HMAC.hexdigest("SHA256", Rails.application.key_generator.generate_key("report_#{purpose}", 32), secret.to_s)
   end
 
+  # The day after the last editable day, the date goes: kept longer, it would only date the submission.
+  def self.close_expired_edit_windows
+    where(editable_until: ...Date.current).update_all(editable_until: nil)
+  end
+
   # Destroying under the row lock: a draft saved meanwhile has a new expiry and is kept.
   def self.purge_expired_drafts
     expired_drafts.find_each do |report|
