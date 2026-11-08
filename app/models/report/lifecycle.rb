@@ -31,6 +31,10 @@ module Report::Lifecycle
       save!
       report_ownership&.update!(cutoff_on: draft_cutoff_on)
     end
+  rescue ActiveRecord::RecordInvalid
+    # Errors stay for the form; unsaved values go, so the next call can lock the row again.
+    restore_attributes
+    raise
   end
 
   # Returns the tracking code in clear in anonymous mode, the only time it exists outside the

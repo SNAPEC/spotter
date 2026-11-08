@@ -249,6 +249,18 @@ RSpec.describe Report, type: :model do
       expect(report.reload.casualties).to be_empty
     end
 
+    it "keeps its errors after a failed save and accepts the next one" do
+      expect { report.save_draft!(discipline: "bogus") }.to raise_error(ActiveRecord::RecordInvalid)
+      expect(report.errors.attribute_names).to include(:discipline)
+
+      expect { report.save_draft!(casualties_attributes: [ { severity: "bogus" } ]) }.to raise_error(ActiveRecord::RecordInvalid)
+
+      report.save_draft!(discipline: "lead")
+
+      expect(report.reload.discipline).to eq("lead")
+      expect(report.casualties).to be_empty
+    end
+
     it "refuses a report that is no longer a draft" do
       report.submit!
 
