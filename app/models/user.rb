@@ -30,8 +30,7 @@ class User < ApplicationRecord
   end
 
   # Unknown emails get a declarant account so the answer never reveals who is registered. A deactivated
-  # account gets the same answer and the same
-  # work; the mailer sends nothing for it.
+  # account gets the same answer and the same work; the mailer sends nothing for it.
   def self.send_magic_link(email)
     create_or_find_by(email: email).tap do |user|
       MagicLinkMailer.with(user: user).sign_in.deliver_later if user.persisted?
