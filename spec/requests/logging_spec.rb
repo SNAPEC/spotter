@@ -5,11 +5,11 @@ RSpec.describe "Request logging", type: :request do
   let(:io) { StringIO.new }
 
   around do |example|
-    original = Rails.logger
-    Rails.logger = ActiveSupport::TaggedLogging.new(Logger.new(io, level: Logger::INFO))
+    original, original_controller = Rails.logger, ActionController::Base.logger
+    Rails.logger = ActionController::Base.logger = ActiveSupport::TaggedLogging.new(Logger.new(io, level: Logger::INFO))
     example.run
   ensure
-    Rails.logger = original
+    Rails.logger, ActionController::Base.logger = original, original_controller
   end
 
   it "logs the request line without the client IP address" do
@@ -35,5 +35,32 @@ RSpec.describe "Request logging", type: :request do
     expect(io.string.scan('Started GET "/login/[FILTERED]"').size).to eq(1)
     expect(io.string.scan('Started POST "/login/[FILTERED]"').size).to eq(1)
     expect(io.string).not_to include(token)
+  end
+
+  it "masks any id in the request line, including on a 404" do
+    id = SecureRandom.uuid
+
+    post "/reports/#{id}/clarifications", env: { "action_dispatch.logger" => Rails.logger }
+
+    expect(io.string).to include('Started POST "/reports/[FILTERED]/clarifications"')
+    expect(io.string).not_to include(id)
+  end
+
+  it "masks an id in the query string, whatever the parameter" do
+    id = SecureRandom.uuid
+
+    get "/login?report=#{id}&next=/reports/#{id}/edit"
+
+    expect(io.string).to include('"report" => "[FILTERED]"')
+    expect(io.string).not_to include(id)
+  end
+
+  it "logs a redirect to a location holding an id as filtered" do
+    request = ActionDispatch::Request.new(Rails.application.env_config.dup)
+    response = ActionDispatch::Response.new
+    response.request = request
+    response.location = "http://www.example.com/reports/#{SecureRandom.uuid}"
+
+    expect(response.filtered_location).to eq("[FILTERED]")
   end
 end
