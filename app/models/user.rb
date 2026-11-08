@@ -56,6 +56,9 @@ class User < ApplicationRecord
       email.to_s.strip.downcase)
   end
 
+  # Carries only the original error class name, so the reporter never sees a message with account data.
+  PurgeFailure = Class.new(StandardError)
+
   # One account failing must not stop the others; the log names the error class only.
   def self.purge_unused
     purge_due.find_each do |user|
@@ -64,6 +67,7 @@ class User < ApplicationRecord
       next
     rescue ActiveRecord::ActiveRecordError => error
       Rails.logger.error("Unused account purge skipped an account: #{error.class.name}")
+      Rails.error.report(PurgeFailure.new(error.class.name), handled: true)
     end
   end
 
