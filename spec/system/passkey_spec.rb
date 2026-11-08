@@ -24,8 +24,10 @@ RSpec.describe "Passkeys", type: :system do
   after { Capybara.app_host = nil }
 
   def sign_in(user)
-    visit magic_link_path(user.reload.magic_link_token)
+    path = magic_link_path(user.reload.magic_link_token)
+    visit path
     click_on "Se connecter"
+    expect(page).to have_no_current_path(path)
   end
 
   it "registers a passkey with an enrollment code, then signs in with it" do
@@ -38,13 +40,17 @@ RSpec.describe "Passkeys", type: :system do
     fill_in "Nom de l’appareil", with: "Ordinateur de test"
     click_on "Enregistrer une passkey"
 
-    expect(page).to have_content("Vos codes de secours")
+    # Wait for each navigation through the title or the path, which need no DOM node of the page being
+    # replaced: reading one mid-navigation raises a Selenium error that Capybara does not retry.
+    expect(page).to have_title("Vos codes de secours")
     expect(page).to have_css("li code", count: 10)
     click_on "Continuer"
+    expect(page).to have_current_path("/analyst")
     expect(page).to have_css("h1", text: "Analyse")
     expect(analyst.passkeys.sole.nickname).to eq("Ordinateur de test")
 
     click_on "Se déconnecter", exact: true
+    expect(page).to have_current_path(login_path)
     expect(page).to have_content("Vous êtes déconnecté.")
 
     visit "/analyst"
@@ -52,6 +58,7 @@ RSpec.describe "Passkeys", type: :system do
     expect(page).to have_content("Vérifier avec ma passkey")
     click_on "Vérifier avec ma passkey"
 
+    expect(page).to have_current_path("/analyst")
     expect(page).to have_css("h1", text: "Analyse")
   end
 end
