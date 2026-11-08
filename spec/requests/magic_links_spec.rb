@@ -16,6 +16,11 @@ RSpec.describe "Magic link sign-in", type: :request do
     perform_enqueued_jobs { post login_path, params: { email: email }, env: env }
   end
 
+  # The CSP nonce is fresh for every response: everything else must match.
+  def answer
+    [ response.status, response.body.gsub(request.content_security_policy_nonce, "nonce") ]
+  end
+
   def link_path_from_last_email
     URI(ActionMailer::Base.deliveries.last.text_part.body.decoded[%r{http://\S+/login/\S+}]).path
   end
@@ -66,10 +71,10 @@ RSpec.describe "Magic link sign-in", type: :request do
 
   it "answers an unknown email exactly like a known one and creates a declarant" do
     request_link("lea.martin@example.com")
-    known = [ response.status, response.body ]
+    known = answer
 
     expect { request_link("nouveau@example.com") }.to change(User, :count).by(1)
-    expect([ response.status, response.body ]).to eq(known)
+    expect(answer).to eq(known)
     expect(response.body).to include("Vérifiez votre boîte")
     expect(ActionMailer::Base.deliveries.last.to).to eq([ "nouveau@example.com" ])
     expect(User.find_by(email: "nouveau@example.com")).to have_attributes(role: "declarant")

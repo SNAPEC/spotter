@@ -12,6 +12,11 @@ RSpec.describe "Deactivated staff", type: :request do
     ActionMailer::Base.deliveries.clear
   end
 
+  # The CSP nonce is fresh for every response: everything else must match.
+  def answer
+    [ response.status, response.body.gsub(request.content_security_policy_nonce, "nonce") ]
+  end
+
   def signed_in?
     jar = ActionDispatch::Cookies::CookieJar.build(request, cookies.to_hash)
     Session.exists?(id: jar.signed[:session_id])
@@ -19,12 +24,12 @@ RSpec.describe "Deactivated staff", type: :request do
 
   it "answers a magic link request exactly like for an active account, and sends nothing" do
     post login_path, params: { email: "analyste@example.test" }
-    active_answer = [ response.status, response.body ]
+    active_answer = answer
 
     analyst.deactivate!(by: admin)
     perform_enqueued_jobs { post login_path, params: { email: "analyste@example.test" } }
 
-    expect([ response.status, response.body ]).to eq(active_answer)
+    expect(answer).to eq(active_answer)
     expect(ActionMailer::Base.deliveries).to be_empty
   end
 
