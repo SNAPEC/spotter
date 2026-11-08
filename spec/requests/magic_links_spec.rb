@@ -175,20 +175,32 @@ RSpec.describe "Magic link sign-in", type: :request do
       expect(ActionMailer::Base.deliveries.size).to eq(3)
     end
 
-    it "caps an address at 20 links a day across clients, with the generic answer, unchanged" do
+    it "caps an address at 10 links per 6 hours across clients, with the generic answer, unchanged" do
       request_link("autre@example.com", env: { "REMOTE_ADDR" => "203.0.113.30" })
       normal = answer
-      20.times { |n| request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "198.51.100.#{n + 1}" }) }
-      expect(ActionMailer::Base.deliveries.size).to eq(21)
+      10.times { |n| request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "198.51.100.#{n + 1}" }) }
+      expect(ActionMailer::Base.deliveries.size).to eq(11)
 
       request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "198.51.100.200" })
-      expect(ActionMailer::Base.deliveries.size).to eq(21)
+      expect(ActionMailer::Base.deliveries.size).to eq(11)
       expect(answer).to eq(normal)
 
-      travel 1.day + 1.second do
+      travel 6.hours + 1.second do
         request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "198.51.100.201" })
-        expect(ActionMailer::Base.deliveries.size).to eq(22)
+        expect(ActionMailer::Base.deliveries.size).to eq(12)
       end
+    end
+
+    it "keeps showing the validation error for a blank or malformed address, however many times" do
+      client = 0
+      [ "", "   ", "pas-un-email" ].each do |email|
+        15.times do
+          request_link(email, env: { "REMOTE_ADDR" => "198.51.100.#{client += 1}" })
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.body).to include("adresse")
+        end
+      end
+      expect(keys.size).to eq(45)
     end
 
     it "keys the limits on fingerprints, never on the IP or the address" do

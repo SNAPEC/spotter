@@ -6,12 +6,13 @@ class MagicLinksController < ApplicationController
     store: Rails.configuration.x.rate_limit_store || cache_store
   # Per address, against mail-bombing one inbox: strict per address and client, so a third party only
   # throttles its own requests, and a broad daily cap per address alone. Capped answers stay the
-  # generic one, so a limit says nothing about the address.
-  rate_limit to: 3, within: 1.hour, only: :create, name: "email_client",
+  # generic one, so a limit says nothing about the address. A blank or malformed address is skipped:
+  # it creates nothing, and must keep showing its validation error.
+  rate_limit to: 3, within: 1.hour, only: :create, name: "email_client", if: :email_limitable?,
     by: -> { "#{User.email_fingerprint(params[:email])}:#{IpFingerprint.for(request)}" },
     with: -> { render :create },
     store: Rails.configuration.x.rate_limit_store || cache_store
-  rate_limit to: 20, within: 1.day, only: :create, name: "email",
+  rate_limit to: 10, within: 6.hours, only: :create, name: "email", if: :email_limitable?,
     by: -> { User.email_fingerprint(params[:email]) },
     with: -> { render :create },
     store: Rails.configuration.x.rate_limit_store || cache_store
@@ -39,5 +40,11 @@ class MagicLinksController < ApplicationController
     else
       redirect_to login_path, alert: t(".invalid")
     end
+  end
+
+  private
+
+  def email_limitable?
+    params[:email].to_s.strip.match?(URI::MailTo::EMAIL_REGEXP)
   end
 end
