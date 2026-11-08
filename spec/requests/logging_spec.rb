@@ -63,4 +63,16 @@ RSpec.describe "Request logging", type: :request do
 
     expect(response.filtered_location).to eq("[FILTERED]")
   end
+
+  it "logs an unrescued exception without the id its message quotes" do
+    id = SecureRandom.uuid
+    app = ActionDispatch::DebugExceptions.new(->(_env) { raise ArgumentError, "Couldn't process Report #{id}" })
+    env = Rack::MockRequest.env_for("/", "action_dispatch.show_exceptions" => :all,
+      "action_dispatch.show_detailed_exceptions" => false, "action_dispatch.logger" => Rails.logger)
+
+    expect { app.call(env) }.to raise_error(ArgumentError)
+
+    expect(io.string).to include("ArgumentError (Couldn't process Report [FILTERED])")
+    expect(io.string).not_to include(id)
+  end
 end
