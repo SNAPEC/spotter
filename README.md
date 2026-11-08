@@ -21,6 +21,24 @@ Spotter est l'outil de retour d'expérience (RETEX) du SNAPEC, le Syndicat natio
 - Modèle Mistral via Scaleway Generative APIs
 - Déploiement avec Kamal sur une machine virtuelle Scaleway, en France
 
+## Développer
+
+Prérequis : Ruby (version dans `.ruby-version`) et PostgreSQL, ou Docker pour lancer la base locale.
+
+```sh
+scripts/ci/install-hooks.sh   # une fois après le clonage : hooks git (RuboCop, Brakeman, bundler-audit)
+bin/setup                     # dépendances et base (données fictives à sa création), puis lance bin/dev
+bin/dev                       # serveur Rails et compilation Tailwind, sur http://localhost:3000
+bundle exec rspec             # tests
+```
+
+En développement seulement :
+
+- `/dev/login` se connecte à un compte fictif (déclarant, analyste, administrateur) sans e-mail ni passkey.
+- `/dev/styleguide` montre tous les composants de l'interface.
+
+Ces deux pages répondent 404 dans tous les autres environnements.
+
 ## Contribuer
 
 Voir [CONTRIBUTING.md](CONTRIBUTING.md). Règle absolue : **aucune donnée réelle** dans ce dépôt, ni dans le code, ni dans les tests, ni dans les captures d'écran.
