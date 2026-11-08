@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 # A job log line carries a timestamp: with the report id or the recipient next to it, the log would
 # link a report to its author or date the submission to the second.
@@ -22,7 +23,7 @@ RSpec.describe "Report job logging", type: :job do
   it "logs neither the report nor the recipient while analysing and asking for a clarification" do
     report, = Report.start_draft!(mode: "confidential", user: declarant)
     report.save_draft!(narrative_attributes: { raw_text: "Récit fictif." })
-    report.submit!
+    submittable(report).submit!
     perform_enqueued_jobs only: AnalyzeReportJob
     report.reload.ask_clarification!(analyst, "Question fictive ?")
     perform_enqueued_jobs { ClarificationDigestJob.perform_now }

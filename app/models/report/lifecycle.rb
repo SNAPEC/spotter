@@ -50,9 +50,7 @@ module Report::Lifecycle
     with_lock do
       raise Report::NotAllowed, "not the declarant of this report" unless declarant?(user: user, tracking_code: tracking_code)
       raise Report::InvalidTransition, "cannot edit a #{status} report" unless under_analysis?
-      raise Report::InvalidTransition, "already taken in charge" if taken_in_charge?
-      raise Report::InvalidTransition, "raw content purged" if raw_content_purged?
-      raise Report::InvalidTransition, "editing window closed" unless editable_until && editable_until >= Date.current
+      raise Report::InvalidTransition, "not editable by the declarant" unless editable_by_declarant?
 
       analyzer = Report::Analyzer.new
       analyzed_text = analyzer.text_of(self)
@@ -81,6 +79,7 @@ module Report::Lifecycle
     with_lock do
       raise Report::InvalidTransition, "cannot submit from #{status}" unless open_draft?
       raise Report::InvalidTransition, "authorship link already cut" if confidential? && report_ownership.nil?
+      check_submittable!
 
       code = RecoveryCode.generate_one if anonymous?
       through_lifecycle do
@@ -153,6 +152,14 @@ module Report::Lifecycle
   end
 
   private
+    # Nothing is assigned: the report stays as it was.
+    def check_submittable!
+      errors.clear
+      errors.add(:event_type, :blank) if event_type.blank?
+      errors.add(:narrative, :blank) if narrative&.raw_text.blank?
+      raise ActiveRecord::RecordInvalid, self if errors.any?
+    end
+
     # editable_until gives away the exact submission day: it goes as soon as editing closes.
     def close_editing
       self.taken_in_charge = true

@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe AnalyzeReportJob, type: :job do
   include ActiveJob::TestHelper
@@ -13,13 +14,13 @@ RSpec.describe AnalyzeReportJob, type: :job do
   end
 
   it "is enqueued by submit! with the report and its content revision as its only arguments" do
-    expect { report.submit! }.to have_enqueued_job(described_class).with(report, 0).exactly(:once)
+    expect { submittable(report).submit! }.to have_enqueued_job(described_class).with(report, 0).exactly(:once)
     expect(enqueued_jobs.sole["arguments"]).to eq([ { "_aj_globalid" => report.to_global_id.to_s }, 0 ])
   end
 
   it "is enqueued only once the submission commits" do
     Report.transaction do
-      report.submit!
+      submittable(report).submit!
       expect(enqueued_jobs).to be_empty
     end
 
@@ -28,7 +29,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
 
   it "is not enqueued when the submission rolls back" do
     Report.transaction do
-      report.submit!
+      submittable(report).submit!
       raise ActiveRecord::Rollback
     end
 
@@ -37,7 +38,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
   end
 
   it "analyses the report once, even when run again" do
-    report.submit!
+    submittable(report).submit!
     perform_enqueued_jobs
     described_class.perform_now(report, report.content_revision)
 
@@ -93,7 +94,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
 
     it "gives an unavailable extractor about an hour, then hands the report over without error, once" do
       use_extractor { |text| raise Timeout::Error, "upstream echoed: #{text}" }
-      report.submit!
+      submittable(report).submit!
 
       expect { drain }.not_to raise_error
       described_class.perform_now(report, report.content_revision)
@@ -108,7 +109,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
 
     it "tries three times on any other error, then hands the report over without error" do
       use_extractor { |_text| [] }
-      report.submit!
+      submittable(report).submit!
 
       expect { drain }.not_to raise_error
 
@@ -122,7 +123,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
       use_extractor
       broken = Rails.configuration.x.llm_extractor
       def broken.provider = raise("provider unavailable")
-      report.submit!
+      submittable(report).submit!
 
       expect { drain }.not_to raise_error
       expect(Analysis.where(report_id: report.id)).to be_empty
@@ -149,7 +150,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
   end
 
   it "is discarded when the report no longer exists" do
-    report.submit!
+    submittable(report).submit!
     report.destroy!
 
     expect { perform_enqueued_jobs }.not_to raise_error

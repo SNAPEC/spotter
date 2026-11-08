@@ -1,4 +1,14 @@
 fr:
+  date:
+    day_names: [dimanche, lundi, mardi, mercredi, jeudi, vendredi, samedi]
+    abbr_day_names: [dim, lun, mar, mer, jeu, ven, sam]
+    month_names: [~, janvier, février, mars, avril, mai, juin, juillet, août, septembre, octobre, novembre, décembre]
+    abbr_month_names: [~, janv., févr., mars, avr., mai, juin, juil., août, sept., oct., nov., déc.]
+    order: [day, month, year]
+    formats:
+      default: "%d/%m/%Y"
+      short: "%e %b"
+      long: "%e %B %Y"
   magic_link_mailer:
     sign_in:
       subject: "Votre lien de connexion à Spotter"
@@ -196,6 +206,10 @@ fr:
       too_many_requests: "Trop d’essais. Réessayez dans quelques minutes."
   activerecord:
     attributes:
+      report:
+        event_type: "Le type d’événement"
+        narrative: "Le récit"
+        casualties: "Les personnes blessées"
       narrative:
         raw_text: "Le récit"
         debrief_causes: "Ce qui a mené à l’événement"
@@ -210,6 +224,10 @@ fr:
         no_fields: "Une version sans champ ne peut pas être publiée."
         published_version: "Une version publiée de la taxonomie est immuable."
       models:
+        report:
+          attributes:
+            casualties:
+              too_many: "ne peuvent pas être plus de %{count} par signalement"
         narrative:
           attributes:
             free_text_answers:

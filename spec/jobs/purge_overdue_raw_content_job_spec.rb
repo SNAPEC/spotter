@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe PurgeOverdueRawContentJob, type: :job do
   include ActiveSupport::Testing::TimeHelpers
@@ -9,7 +10,7 @@ RSpec.describe PurgeOverdueRawContentJob, type: :job do
     report, = travel_to(Date.new(2026, 11, 17)) do
       Report.start_draft!(mode: "anonymous").tap do |draft, _token|
         draft.save_draft!(narrative_attributes: { raw_text: "Récit fictif." })
-        draft.submit!
+        submittable(draft).submit!
       end
     end
 

@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 # Outside a test transaction: inside one, every row would share the test's transaction id.
 RSpec.describe Report, "rows kept after the decision", type: :model do
@@ -27,7 +28,7 @@ RSpec.describe Report, "rows kept after the decision", type: :model do
         narrative_attributes: { raw_text: "Récit fictif." },
         casualties_attributes: [ { severity: "minor" }, { severity: "severe" } ]
       )
-      report.submit!
+      submittable(report).submit!
       Report::Analyzer.new.call(report, revision: report.content_revision)
       expect(xmins("casualties", report).uniq).not_to eq(xmins("reports", report))
 

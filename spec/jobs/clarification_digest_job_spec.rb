@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 require "fugit"
 
 RSpec.describe ClarificationDigestJob, type: :job do
@@ -14,7 +15,7 @@ RSpec.describe ClarificationDigestJob, type: :job do
   def in_validation(mode, user: nil)
     Report.start_draft!(mode: mode, user: user).first.tap do |report|
       report.save_draft!(narrative_attributes: { raw_text: "Récit fictif." })
-      report.submit!
+      submittable(report).submit!
       report.start_analysis!
       report.ready_for_validation!
     end

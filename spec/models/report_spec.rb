@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Report, type: :model do
   include ActiveSupport::Testing::TimeHelpers
@@ -26,7 +27,7 @@ RSpec.describe Report, type: :model do
 
     it "refuses an editing window on a report the declarant can no longer edit" do
       report, = described_class.start_draft!(mode: "anonymous")
-      report.submit!
+      submittable(report).submit!
       analyst = User.create!(email: "chloe.bernard@example.com", role: "analyst")
 
       expect { described_class.transaction(requires_new: true) { report.update_column(:taken_in_charge, true) } }
@@ -126,7 +127,7 @@ RSpec.describe Report, type: :model do
 
     it "no longer finds the report once submitted" do
       report, token = described_class.start_draft!(mode: "anonymous")
-      report.submit!
+      submittable(report).submit!
 
       expect(described_class.find_draft_by_token(token)).to be_nil
     end
@@ -144,7 +145,7 @@ RSpec.describe Report, type: :model do
 
     it "ignores an overdue link even before the daily job has cut it" do
       report, = described_class.start_draft!(mode: "confidential", user: user)
-      travel_to(Date.new(2026, 11, 17)) { report.submit! }
+      travel_to(Date.new(2026, 11, 17)) { submittable(report).submit! }
 
       travel_to(Date.new(2027, 1, 15)) { expect(described_class.owned_by(user)).to contain_exactly(report) }
       travel_to(Date.new(2027, 1, 16)) { expect(described_class.owned_by(user)).to be_empty }
@@ -159,7 +160,7 @@ RSpec.describe Report, type: :model do
 
     it "finds the submitted report while the link exists, and no longer after the cutoff" do
       report, = described_class.start_draft!(mode: "confidential", user: user)
-      travel_to(Date.new(2026, 11, 17)) { report.submit! }
+      travel_to(Date.new(2026, 11, 17)) { submittable(report).submit! }
 
       travel_to(Date.new(2027, 1, 15)) do
         ReportOwnership.cut_due
@@ -185,7 +186,7 @@ RSpec.describe Report, type: :model do
         run_daily_jobs
 
         expect(described_class.owned_by(user)).to contain_exactly(report)
-        expect { report.submit! }.not_to raise_error
+        expect { submittable(report).submit! }.not_to raise_error
       end
     end
 
@@ -207,7 +208,7 @@ RSpec.describe Report, type: :model do
     end
 
     it "cannot be pushed past 60 days from today once submitted" do
-      report.submit!
+      submittable(report).submit!
 
       expect { report.report_ownership.update!(cutoff_on: Date.current + 61) }.to raise_error(ActiveRecord::RecordInvalid)
       expect { ReportOwnership.find_by(report_id: report.id).update!(cutoff_on: Date.current + 3650) }.to raise_error(ActiveRecord::RecordInvalid)
@@ -219,7 +220,7 @@ RSpec.describe Report, type: :model do
     end
 
     it "is frozen once submitted, even to a value within 60 days" do
-      travel_to(Date.new(2026, 11, 17)) { report.submit! }
+      travel_to(Date.new(2026, 11, 17)) { submittable(report).submit! }
 
       travel_to(Date.new(2026, 11, 20)) do
         [ report.report_ownership, ReportOwnership.find_by(report_id: report.id) ].each do |ownership|
@@ -330,7 +331,7 @@ RSpec.describe Report, type: :model do
     end
 
     it "refuses a report that is no longer a draft" do
-      report.submit!
+      submittable(report).submit!
 
       expect { report.save_draft!(discipline: "lead") }.to raise_error(Report::InvalidTransition)
     end
