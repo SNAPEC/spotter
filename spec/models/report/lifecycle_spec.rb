@@ -241,6 +241,16 @@ RSpec.describe Report::Lifecycle, type: :model do
     end
   end
 
+  describe "a narrative without free-text answers" do
+    it "can still be purged" do
+      report = in_validation
+      report.narrative.update_column(:free_text_answers, nil)
+
+      expect { report.validate!(analyst) }.not_to raise_error
+      expect(report.reload).to be_validated
+    end
+  end
+
   describe "free-text codes" do
     let(:report) { draft }
 

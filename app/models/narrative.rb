@@ -25,7 +25,7 @@ class Narrative < ApplicationRecord
     end
 
     def free_text_answers_fit_taxonomy
-      answers = free_text_answers
+      answers = free_text_answers || {}
       return errors.add(:free_text_answers, :invalid) unless answers.is_a?(Hash)
 
       known = report.taxonomy_version.free_text_codes(scope: :report)
