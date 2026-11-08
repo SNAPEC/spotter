@@ -5,11 +5,11 @@ class ApplicationMailDeliveryJob < ActionMailer::MailDeliveryJob
 
   queue_as :default
   # Any error, after the last attempt, ends here instead of in a failed execution, which would keep the
-  # user's GlobalID. A failing hook is swallowed for the same reason.
+  # user's GlobalID. A failing hook is logged by its class only, for the same reason.
   retry_on StandardError, wait: :polynomially_longer, attempts: 3 do |job, _error|
     job.delivery_abandoned
-  rescue StandardError
-    nil
+  rescue StandardError => error
+    job.logger.error("#{job.class.name}: delivery_abandoned failed with #{error.class.name}")
   end
   discard_on ActiveJob::DeserializationError, ActiveRecord::RecordNotFound
 
