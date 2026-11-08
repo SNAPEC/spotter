@@ -1,13 +1,15 @@
 class Session < ApplicationRecord
   belongs_to :user
 
+  validate :user_is_active, on: :create
+
   attribute :expires_on, :date, default: -> { Date.current.next_month.end_of_month }
 
   scope :expired, -> { where(expires_on: ...Date.current) }
 
   # Deletion belongs to PurgeExpiredSessionsJob: a GET never writes.
   def self.resume(id)
-    find_by(id: id).then { |session| session unless session&.expired? }
+    find_by(id: id).then { |session| session unless session.nil? || session.expired? || session.user.deactivated? }
   end
 
   def self.purge_expired
@@ -37,6 +39,7 @@ class Session < ApplicationRecord
   # The first passkey needs the enrollment code an admin handed over: the magic link alone is not enough.
   # Returns the recovery codes when the user had none left, else an empty array.
   def register_passkey!(credential:, nickname: nil, enrollment_code: nil)
+    raise Passkey::InvalidCredential, "deactivated account" if user.deactivated?
     raise Passkey::InvalidCredential, "session not verified" unless may_register_passkey?
     challenge = consume_webauthn_challenge!
 
@@ -52,6 +55,8 @@ class Session < ApplicationRecord
   end
 
   def verify_passkey(credential:)
+    return false if user.deactivated?
+
     challenge = consume_webauthn_challenge!
     Passkey.authenticate(user: user, credential: credential, challenge: challenge).present? && update!(passkey_verified: true)
   end
@@ -61,6 +66,10 @@ class Session < ApplicationRecord
   end
 
   private
+    def user_is_active
+      errors.add(:user, :invalid) if user&.deactivated?
+    end
+
     # Read and cleared under a row lock, in its own transaction: a challenge serves once, even if the
     # ceremony then fails.
     def consume_webauthn_challenge!
