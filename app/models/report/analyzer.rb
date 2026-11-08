@@ -28,10 +28,10 @@ class Report::Analyzer
     proposals = extract(report, fields)
     check!(report, proposals, fields)
 
-    # The declarant may have edited the report while the extractor ran: proposals and excerpts would
-    # then describe a text that no longer exists.
+    # The declarant may have edited the report, or its raw content been purged, while the extractor
+    # ran: proposals and excerpts would then quote a text that no longer exists.
     report.with_lock do
-      next analysis_of(report) unless report.analyzing? && report.content_revision == revision
+      next analysis_of(report) unless report.analyzing? && report.content_revision == revision && !report.raw_content_purged?
 
       analysis = report.analyses.create!(
         provider: @extractor.provider, model: @extractor.model, prompt_version: @extractor.prompt_version, proposals: proposals

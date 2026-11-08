@@ -107,6 +107,23 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     expect(report.reload).to be_in_validation
   end
 
+  it "keeps an analysis running during the purge from writing excerpts of the purged text" do
+    report, = submitted
+    clear_enqueued_jobs
+    extractor = Llm::FakeExtractor.new
+    extractor.define_singleton_method(:extract) do |text:, schema:|
+      Report.purge_overdue_raw_content
+      super(text: text, schema: schema)
+    end
+
+    travel_to(due_day) do
+      expect(Report::Analyzer.new(extractor: extractor).call(report, revision: report.content_revision)).to be_nil
+    end
+
+    expect(Analysis.where(report_id: report.id)).to be_empty
+    expect(report.reload).to have_attributes(raw_content_purged: true, status: "analyzing")
+  end
+
   it "leaves drafts and decided reports alone" do
     draft, = travel_to(submission_day) { Report.start_draft!(mode: "anonymous") }
     decided = in_validation

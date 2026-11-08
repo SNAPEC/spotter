@@ -129,6 +129,9 @@ module Report::Lifecycle
       next unless Report.raw_content_overdue.exists?(id)
 
       purge_raw_content
+      # The status stays: a new revision makes an analysis still running on the purged text write
+      # nothing, its excerpts would bring the text back. A decision changes the status instead.
+      self.content_revision += 1
       save!
     end
   end
