@@ -16,11 +16,15 @@ module Report::Lifecycle
   # Only the content of the form: state, dates and digests stay in the lifecycle's hands.
   def save_draft!(attrs)
     attrs = attrs.to_h.deep_stringify_keys
-    check_draft_keys!(attrs.keys, Report::DRAFT_ATTRIBUTES)
-    check_draft_keys!(attrs.fetch("narrative_attributes", {}).keys, Report::DRAFT_NARRATIVE_ATTRIBUTES)
-    casualties = attrs.fetch("casualties_attributes", [])
-    (casualties.is_a?(Hash) ? casualties.values : casualties).each do |casualty|
-      check_draft_keys!(casualty.keys, Report::DRAFT_CASUALTY_ATTRIBUTES)
+    check_draft_keys!(attrs, Report::DRAFT_ATTRIBUTES)
+    check_draft_keys!(attrs["narrative_attributes"], Report::DRAFT_NARRATIVE_ATTRIBUTES) if attrs.key?("narrative_attributes")
+    if attrs.key?("casualties_attributes")
+      casualties = attrs["casualties_attributes"]
+      raise ArgumentError, "casualties must be a list or a hash" unless casualties.is_a?(Hash) || casualties.is_a?(Array)
+
+      (casualties.is_a?(Hash) ? casualties.values : casualties).each do |casualty|
+        check_draft_keys!(casualty, Report::DRAFT_CASUALTY_ATTRIBUTES)
+      end
     end
 
     with_lock do
@@ -31,7 +35,7 @@ module Report::Lifecycle
       save!
       report_ownership&.update!(cutoff_on: draft_cutoff_on)
     end
-  rescue ActiveRecord::RecordInvalid
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound
     # Errors stay for the form; unsaved values go, so the next call can lock the row again.
     restore_attributes
     raise
@@ -93,8 +97,10 @@ module Report::Lifecycle
       errors.add(:status, :invalid) if will_save_change_to_status? && !lifecycle_transition?
     end
 
-    def check_draft_keys!(keys, allowed)
-      unexpected = keys - allowed
+    def check_draft_keys!(attrs, allowed)
+      raise ArgumentError, "draft content must be a hash" unless attrs.is_a?(Hash)
+
+      unexpected = attrs.keys - allowed
       raise ArgumentError, "not draft content: #{unexpected.join(", ")}" if unexpected.any?
     end
 
@@ -118,7 +124,7 @@ module Report::Lifecycle
     # Everything that could point back to the author or quote them goes, in one transaction. Free-text
     # answers go too: only coded answers are kept.
     def purge_after_decision!
-      text_codes = taxonomy_version.fields.where(kind: "text").pluck(:code)
+      text_codes = free_text_codes
       narrative&.purge_raw!
       casualties.each { |casualty| casualty.update!(answers: casualty.answers.except(*text_codes)) }
       report_ownership&.destroy!

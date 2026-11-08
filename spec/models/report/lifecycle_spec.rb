@@ -133,6 +133,21 @@ RSpec.describe Report::Lifecycle, type: :model do
       end
     end
 
+    %i[validate! reject!].each do |decision|
+      it "refuses free-text answers written back after #{decision}" do
+        report = in_validation
+        report.public_send(decision, analyst)
+
+        stale = Report.find(report.id)
+        expect { stale.update!(answers: stale.answers.merge("material_damage" => "Texte fictif réinjecté")) }
+          .to raise_error(ActiveRecord::RecordInvalid)
+        expect { report.casualties.sole.update!(answers: { "injury_detail" => "Détail fictif réinjecté" }) }
+          .to raise_error(ActiveRecord::RecordInvalid)
+        expect(Report.find(report.id).answers).not_to have_key("material_damage")
+        expect(Casualty.where(report_id: report.id).sole.answers).not_to have_key("injury_detail")
+      end
+    end
+
     it "refuses a status change outside the lifecycle" do
       report = in_validation
 

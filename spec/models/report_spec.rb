@@ -277,6 +277,30 @@ RSpec.describe Report, type: :model do
       expect(report.casualties).to be_empty
     end
 
+    it "restores the report after a casualty id that is not its own" do
+      other, = described_class.start_draft!(mode: "anonymous")
+      other.save_draft!(casualties_attributes: [ { severity: "minor" } ])
+
+      expect { report.save_draft!(discipline: "lead", casualties_attributes: [ { id: other.casualties.sole.id, severity: "fatal" } ]) }
+        .to raise_error(ActiveRecord::RecordNotFound)
+      expect(report.discipline).to be_nil
+      expect(report.changed).to be_empty
+
+      report.save_draft!(environment: "indoor")
+      expect(report.reload.environment).to eq("indoor")
+    end
+
+    it "refuses nil or malformed nested attributes with an ArgumentError" do
+      [
+        { narrative_attributes: nil },
+        { narrative_attributes: "raw" },
+        { casualties_attributes: nil },
+        { casualties_attributes: [ "minor" ] }
+      ].each do |attrs|
+        expect { report.save_draft!(attrs) }.to raise_error(ArgumentError)
+      end
+    end
+
     it "refuses a report that is no longer a draft" do
       report.submit!
 
