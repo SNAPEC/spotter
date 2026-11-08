@@ -158,6 +158,22 @@ RSpec.describe Report, type: :model do
     end
   end
 
+  describe "ownership cutoff" do
+    let(:report) { described_class.start_draft!(mode: "confidential", user: user).first }
+
+    it "cannot be pushed past the day after the draft expiry" do
+      expect { report.report_ownership.update!(cutoff_on: report.draft_expires_on + 2) }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it "cannot be pushed past 60 days from today once submitted" do
+      report.submit!
+
+      expect { report.report_ownership.update!(cutoff_on: Date.current + 61) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect { ReportOwnership.find_by(report_id: report.id).update!(cutoff_on: Date.current + 3650) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect(report.report_ownership.reload.cutoff_on).to eq(Date.current + 60)
+    end
+  end
+
   describe "#save_draft!" do
     let(:report) { described_class.start_draft!(mode: "confidential", user: user).first }
 
