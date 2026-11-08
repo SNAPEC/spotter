@@ -13,7 +13,7 @@ Merci de votre intérêt. Spotter traite des récits d'accidents : la confidenti
 - Une branche et une pull request par tâche. La fusion se fait après relecture par une autre personne.
 - Les parties critiques (chiffrement, suppression du lien, logs, authentification) demandent une revue approfondie.
 - Les tests doivent passer avant la fusion.
-- La documentation, les issues et les messages de commit sont rédigés en français. Le code (noms de classes, de méthodes, de variables) est en anglais.
+- Le code, les commentaires et les messages de commit sont en anglais.
 
 ## Signaler un bug ou proposer une idée
 
