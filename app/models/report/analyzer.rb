@@ -15,7 +15,7 @@ class Report::Analyzer
   # Returns the analysis for the extractor's prompt version, or nil when the report is not waiting for
   # one (decided meanwhile, already analysed under another prompt version, or edited since: the
   # revision names the content this run was asked to analyse).
-  def call(report, revision: report.content_revision)
+  def call(report, revision:)
     existing = analysis_of(report)
     return existing if existing
 
@@ -41,7 +41,7 @@ class Report::Analyzer
 
   # When the extractor fails for good, the analyst codes the report by hand: a failed analysis takes
   # the prompt version's place, so the job stays idempotent, and the report moves on to validation.
-  def record_failure(report, revision: report.content_revision)
+  def record_failure(report, revision:)
     report.with_lock do
       next unless report.content_revision == revision
 
