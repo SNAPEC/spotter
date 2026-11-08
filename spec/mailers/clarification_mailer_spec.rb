@@ -57,6 +57,16 @@ RSpec.describe ClarificationMailer, type: :mailer do
     end
   end
 
+  it "sends nothing when the owner's account is deactivated" do
+    report = submitted("confidential")
+    user.update!(deactivated_at: Time.current)
+
+    travel_to(Date.new(2026, 11, 20)) do
+      report.ask_clarification!(analyst, question)
+      expect { perform_enqueued_jobs }.not_to change { ActionMailer::Base.deliveries.size }
+    end
+  end
+
   it "sends nothing once the link is cut" do
     report = submitted("confidential")
     ReportOwnership.where(report_id: report.id).delete_all

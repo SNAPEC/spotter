@@ -134,7 +134,7 @@ class Report < ApplicationRecord
   private
     def declarant?(user:, tracking_code:)
       if confidential?
-        user.present? && tracking_code.nil? && ReportOwnership.live.of(user).exists?(report_id: id)
+        user&.active? && tracking_code.nil? && ReportOwnership.live.of(user).exists?(report_id: id)
       else
         normalized = RecoveryCode.normalize(tracking_code)
         user.nil? && normalized.present? && tracking_code_digest.present? &&

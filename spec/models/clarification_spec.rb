@@ -142,6 +142,12 @@ RSpec.describe Clarification, type: :model do
       expect { report.answer_clarification!("Réponse fictive.") }.to raise_error(Report::NotAllowed)
     end
 
+    it "refuses the owner once their account is deactivated" do
+      user.update!(deactivated_at: Time.current)
+
+      expect { report.answer_clarification!("Réponse fictive.", user: user) }.to raise_error(Report::NotAllowed)
+    end
+
     it "refuses a user whose live ownership is on another report" do
       other_report, = Report.start_draft!(mode: "confidential", user: other)
       other_report.save_draft!(narrative_attributes: { raw_text: "Autre récit fictif." })
