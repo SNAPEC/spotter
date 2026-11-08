@@ -2,7 +2,7 @@ class AnalyzeReportJob < ApplicationJob
   queue_as :default
   # The log line would carry the report id with the exact time of submission, which the month rounding hides.
   self.log_arguments = false
-  # Enqueued from inside submit!'s transaction: the job must not run before the submission is visible.
+  # Enqueued from inside submit!'s and edit_submitted!'s transactions: the job must not run before the change is visible.
   self.enqueue_after_transaction_commit = true
   # After the last attempt, the analyst codes the report by hand rather than wait for it forever.
   retry_on ActiveRecord::ActiveRecordError, Report::Analyzer::InvalidProposals, Report::Analyzer::ExtractionFailed,
