@@ -4,6 +4,8 @@ class Report < ApplicationRecord
   STATUSES = %w[draft submitted analyzing in_validation validated rejected].freeze
   TAXONOMY_COLUMNS = %w[discipline environment cause severity].freeze
   DRAFT_ATTRIBUTES = %w[event_type discipline environment cause severity answers narrative_attributes casualties_attributes].freeze
+  DRAFT_NARRATIVE_ATTRIBUTES = [ "raw_text", *Narrative::DEBRIEF_FIELDS ].freeze
+  DRAFT_CASUALTY_ATTRIBUTES = %w[id severity answers _destroy].freeze
   DRAFT_VALIDITY = 30
 
   class InvalidTransition < StandardError; end

@@ -188,6 +188,30 @@ RSpec.describe Report, type: :model do
       expect(report.reload).to be_draft
     end
 
+    it "refuses nested attributes outside the declarant's content" do
+      other, = described_class.start_draft!(mode: "anonymous")
+
+      [
+        { narrative_attributes: { anonymized_text: "Version forgée" } },
+        { narrative_attributes: { anonymized_debrief: { "x" => "y" } } },
+        { narrative_attributes: { report_id: other.id } },
+        { casualties_attributes: [ { severity: "minor", report_id: other.id } ] },
+        { casualties_attributes: { "0" => { severity: "minor", unexpected: "x" } } }
+      ].each do |attrs|
+        expect { report.save_draft!(attrs) }.to raise_error(ArgumentError)
+      end
+      expect(Narrative.where(report_id: [ report.id, other.id ])).to be_empty
+      expect(Casualty.where(report_id: [ report.id, other.id ])).to be_empty
+    end
+
+    it "accepts casualties as a list or as a form hash, with id and _destroy" do
+      report.save_draft!(casualties_attributes: { "0" => { severity: "minor", answers: {} } })
+      casualty = report.casualties.sole
+      report.save_draft!(casualties_attributes: [ { id: casualty.id, _destroy: "1" } ])
+
+      expect(report.reload.casualties).to be_empty
+    end
+
     it "refuses a report that is no longer a draft" do
       report.submit!
 

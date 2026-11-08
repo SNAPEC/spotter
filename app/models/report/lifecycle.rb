@@ -11,9 +11,13 @@ module Report::Lifecycle
 
   # Only the content of the form: state, dates and digests stay in the lifecycle's hands.
   def save_draft!(attrs)
-    attrs = attrs.to_h.stringify_keys
-    unexpected = attrs.keys - Report::DRAFT_ATTRIBUTES
-    raise ArgumentError, "not draft content: #{unexpected.join(", ")}" if unexpected.any?
+    attrs = attrs.to_h.deep_stringify_keys
+    check_draft_keys!(attrs.keys, Report::DRAFT_ATTRIBUTES)
+    check_draft_keys!(attrs.fetch("narrative_attributes", {}).keys, Report::DRAFT_NARRATIVE_ATTRIBUTES)
+    casualties = attrs.fetch("casualties_attributes", [])
+    (casualties.is_a?(Hash) ? casualties.values : casualties).each do |casualty|
+      check_draft_keys!(casualty.keys, Report::DRAFT_CASUALTY_ATTRIBUTES)
+    end
 
     with_lock do
       raise Report::InvalidTransition, "not an open draft" unless open_draft?
@@ -62,6 +66,11 @@ module Report::Lifecycle
   end
 
   private
+    def check_draft_keys!(keys, allowed)
+      unexpected = keys - allowed
+      raise ArgumentError, "not draft content: #{unexpected.join(", ")}" if unexpected.any?
+    end
+
     def decide!(analyst, from:, to:)
       raise Report::NotAllowed, "only staff decide on a report" unless analyst&.staff?
 
