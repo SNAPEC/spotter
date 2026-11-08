@@ -2,7 +2,7 @@
 # not a foreign key: the trail outlives a purged report. Only the month is kept: an exact time could be
 # matched against the mail provider's log.
 class AccessLog < ApplicationRecord
-  ACTIONS = %w[view ask_clarification validate reject].freeze
+  ACTIONS = %w[view take_charge ask_clarification validate reject].freeze
 
   belongs_to :user
 
