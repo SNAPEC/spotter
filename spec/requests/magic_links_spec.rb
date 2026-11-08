@@ -149,30 +149,56 @@ RSpec.describe "Magic link sign-in", type: :request do
       end
     end
 
-    it "sends 3 links an hour per address, whatever the client, with the generic answer" do
-      3.times { |n| request_link(" Lea.Martin@example.com ", env: { "REMOTE_ADDR" => "203.0.113.#{n + 10}" }) }
-      expect(ActionMailer::Base.deliveries.size).to eq(3)
-
-      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.20" })
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Vérifiez votre boîte de réception")
-      expect(ActionMailer::Base.deliveries.size).to eq(3)
-
-      request_link("autre@example.com", env: { "REMOTE_ADDR" => "203.0.113.20" })
+    it "sends 3 links an hour per address and client, then the generic answer, unchanged" do
+      request_link("autre@example.com", env: { "REMOTE_ADDR" => "203.0.113.30" })
+      normal = answer
+      3.times { request_link(" Lea.Martin@example.com ") }
       expect(ActionMailer::Base.deliveries.size).to eq(4)
 
+      request_link("lea.martin@example.com")
+      expect(ActionMailer::Base.deliveries.size).to eq(4)
+      expect(answer).to eq(normal)
+
+      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.31" })
+      expect(ActionMailer::Base.deliveries.size).to eq(5)
+
       travel 1.hour + 1.second do
-        request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.21" })
-        expect(ActionMailer::Base.deliveries.size).to eq(5)
+        request_link("lea.martin@example.com")
+        expect(ActionMailer::Base.deliveries.size).to eq(6)
+      end
+    end
+
+    it "treats a whole IPv6 /64 as one client for the per-address limit" do
+      3.times { |n| request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "2001:db8:1:2::#{n + 1}" }) }
+      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "2001:db8:1:2::ff" })
+
+      expect(ActionMailer::Base.deliveries.size).to eq(3)
+    end
+
+    it "caps an address at 20 links a day across clients, with the generic answer, unchanged" do
+      request_link("autre@example.com", env: { "REMOTE_ADDR" => "203.0.113.30" })
+      normal = answer
+      20.times { |n| request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "198.51.100.#{n + 1}" }) }
+      expect(ActionMailer::Base.deliveries.size).to eq(21)
+
+      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "198.51.100.200" })
+      expect(ActionMailer::Base.deliveries.size).to eq(21)
+      expect(answer).to eq(normal)
+
+      travel 1.day + 1.second do
+        request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "198.51.100.201" })
+        expect(ActionMailer::Base.deliveries.size).to eq(22)
       end
     end
 
     it "keys the limits on fingerprints, never on the IP or the address" do
       request_link("lea.martin@example.com")
+      ip_fingerprint = IpFingerprint.for(ActionDispatch::Request.new("REMOTE_ADDR" => ip))
+      email_fingerprint = User.email_fingerprint("lea.martin@example.com")
 
-      expect(keys.size).to eq(2)
-      expect(keys.join).to include(IpFingerprint.for(ActionDispatch::Request.new("REMOTE_ADDR" => ip)))
-      expect(keys.join).to include(User.email_fingerprint("lea.martin@example.com"))
+      expect(keys.size).to eq(3)
+      expect(keys).to include(a_string_including("#{email_fingerprint}:#{ip_fingerprint}"))
+      expect(keys).to include(a_string_ending_with(":#{email_fingerprint}"))
       expect(keys.join).not_to include(ip)
       expect(keys.join).not_to include("lea.martin")
     end
