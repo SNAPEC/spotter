@@ -10,9 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_110002) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "access_logs", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.uuid "report_id", null: false
+    t.string "action", null: false
+    t.datetime "created_at", null: false
+    t.index ["report_id"], name: "index_access_logs_on_report_id"
+    t.index ["user_id"], name: "index_access_logs_on_user_id"
+    t.check_constraint "action::text = ANY (ARRAY['view'::character varying::text, 'ask_clarification'::character varying::text, 'validate'::character varying::text, 'reject'::character varying::text])", name: "access_logs_action_check"
+  end
 
   create_table "analyses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "report_id", null: false
@@ -168,6 +178,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_110002) do
     t.check_constraint "role::text = ANY (ARRAY['declarant'::character varying::text, 'analyst'::character varying::text, 'admin'::character varying::text])", name: "users_role_check"
   end
 
+  add_foreign_key "access_logs", "users"
   add_foreign_key "analyses", "reports"
   add_foreign_key "audit_events", "users", column: "actor_id"
   add_foreign_key "casualties", "reports"

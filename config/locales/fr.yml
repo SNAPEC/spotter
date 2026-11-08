@@ -75,6 +75,15 @@ fr:
         once: "Ce code ne sera plus affiché. Il ne sert qu’une fois et expire dans 7 jours."
         back: "Retour à l’administration"
         not_allowed: "Vous ne pouvez pas réinitialiser vos propres passkeys."
+  dev:
+    logins:
+      show:
+        title: "Connexion de développement"
+        intro: "Disponible en développement seulement. Les comptes de l’équipe passent la vérification de passkey."
+        email: "Adresse e-mail"
+        role: "Rôle"
+        actions: "Actions"
+        sign_in: "Se connecter"
   roles:
     declarant: "Déclarant"
     analyst: "Analyste"
