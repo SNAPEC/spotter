@@ -80,6 +80,38 @@ RSpec.describe PurgeUnusedAccountsJob, type: :job do
     expect(User.where(id: staff.map(&:id)).count).to eq(2)
   end
 
+  it "keeps an ex-staff member demoted to declarant, whom logs and audit events point to" do
+    admin = User.create!(email: "admin@example.test", role: "admin")
+    logged, reset = %w[journal audit].map { |name| User.create!(email: "#{name}@example.test", role: "analyst") }
+    AccessLog.record!(user: logged, report: Struct.new(:id).new(SecureRandom.uuid), action: "view")
+    reset.issue_enrollment_code!(by: admin)
+    [ logged, reset ].each { |user| user.update!(role: "declarant"); make_due(user) }
+
+    run_on(Date.current)
+
+    expect(User.where(id: [ logged.id, reset.id ]).count).to eq(2)
+  end
+
+  it "goes on with the other accounts when one fails, logging only the error class" do
+    failing, other = %w[un deux].map { |name| declarant(name).tap { |user| make_due(user) } }
+    allow(ReportOwnership).to receive(:of).and_wrap_original do |original, user|
+      raise ActiveRecord::StatementInvalid, "secret detail" if user.id == failing.id
+
+      original.call(user)
+    end
+    io = StringIO.new
+    Rails.logger.broadcast_to(capture = Logger.new(io))
+
+    described_class.perform_now
+
+    expect(User.exists?(failing.id)).to be(true)
+    expect(User.exists?(other.id)).to be(false)
+    expect(io.string).to include("ActiveRecord::StatementInvalid")
+    expect(io.string).not_to include("secret detail")
+  ensure
+    Rails.logger.stop_broadcasting_to(capture) if capture
+  end
+
   it "deletes the account's codes with it, through the usual deletion" do
     user = declarant
     user.generate_recovery_codes!

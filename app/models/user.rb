@@ -22,7 +22,13 @@ class User < ApplicationRecord
 
   scope :staff, -> { where(role: %w[analyst admin]) }
   scope :active, -> { where(deactivated_at: nil) }
-  scope :purge_due, -> { declarant.where(purge_on: ...Date.current) }
+  # An ex-staff member demoted to declarant stays: access logs and audit events keep pointing at them.
+  scope :purge_due, -> {
+    declarant.where(purge_on: ...Date.current)
+      .where.not(id: AccessLog.select(:user_id))
+      .where.not(id: AuditEvent.select(:actor_id))
+      .where.not(id: AuditEvent.where(subject_type: name).select(:subject_id))
+  }
 
   attribute :purge_on, :date, default: -> { (Date.current + UNUSED_ACCOUNT_DELAY).end_of_month }
 
@@ -50,11 +56,14 @@ class User < ApplicationRecord
       email.to_s.strip.downcase)
   end
 
+  # One account failing must not stop the others; the log names the error class only.
   def self.purge_unused
     purge_due.find_each do |user|
       user.purge_if_unused!
     rescue ActiveRecord::RecordNotFound
       next
+    rescue ActiveRecord::ActiveRecordError => error
+      Rails.logger.error("Unused account purge skipped an account: #{error.class.name}")
     end
   end
 
@@ -123,7 +132,7 @@ class User < ApplicationRecord
   # row lock, which a sign-in creating a session also needs.
   def purge_if_unused!
     with_lock do
-      destroy! if declarant? && purge_on < Date.current && sessions.none? && ReportOwnership.of(self).live.none?
+      destroy! if User.purge_due.exists?(id) && sessions.none? && ReportOwnership.of(self).live.none?
     end
   end
 
