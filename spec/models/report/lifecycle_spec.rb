@@ -113,6 +113,28 @@ RSpec.describe Report::Lifecycle, type: :model do
     end
   end
 
+  describe "access trail" do
+    { validate!: "validate", reject!: "reject" }.each do |decision, action|
+      it "records who decided with #{decision}, and nothing when the transition fails" do
+        report = in_validation
+        report.public_send(decision, analyst)
+
+        expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, action ] ])
+        expect { report.public_send(decision, analyst) }.to raise_error(Report::InvalidTransition)
+        expect(AccessLog.where(report_id: report.id).count).to eq(1)
+      end
+    end
+
+    it "records who asked for a clarification, and nothing when a question is pending" do
+      report = in_validation
+      report.ask_clarification!(analyst, "Question fictive ?")
+
+      expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, "ask_clarification" ] ])
+      expect { report.ask_clarification!(analyst, "Autre question fictive ?") }.to raise_error(Report::InvalidTransition)
+      expect(AccessLog.where(report_id: report.id).count).to eq(1)
+    end
+  end
+
   describe "decided report" do
     %i[validate! reject!].each do |decision|
       it "refuses raw text, debriefing answers and casualty changes after #{decision}" do

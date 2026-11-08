@@ -106,6 +106,7 @@ class Report < ApplicationRecord
     with_lock do
       raise Report::InvalidTransition, "a question is already pending" if awaiting_clarification?
 
+      AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
         ActiveRecord.after_all_transactions_commit { ClarificationMailer.requested(self).deliver_later }
       end

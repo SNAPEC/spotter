@@ -75,11 +75,11 @@ module Report::Lifecycle
 
   # Shadows ActiveModel's validate!: use valid? or save! to run the model validations.
   def validate!(analyst)
-    decide!(analyst, from: %w[in_validation], to: "validated")
+    decide!(analyst, from: %w[in_validation], to: "validated", action: "validate")
   end
 
   def reject!(analyst)
-    decide!(analyst, from: UNDER_ANALYSIS_STATUSES, to: "rejected")
+    decide!(analyst, from: UNDER_ANALYSIS_STATUSES, to: "rejected", action: "reject")
   end
 
   def under_analysis?
@@ -110,10 +110,14 @@ module Report::Lifecycle
       raise ArgumentError, "not draft content: #{unexpected.join(", ")}" if unexpected.any?
     end
 
-    def decide!(analyst, from:, to:)
+    # The access trail is written here, in the decision's transaction, so no screen can forget it.
+    def decide!(analyst, from:, to:, action:)
       raise Report::NotAllowed, "only staff decide on a report" unless analyst&.staff?
 
-      transition!(from: from, to: to) { purge_after_decision! }
+      transition!(from: from, to: to) do
+        AccessLog.record!(user: analyst, report: self, action: action)
+        purge_after_decision!
+      end
     end
 
     # The row lock makes the check and the change atomic. The purge shares the transaction and runs
