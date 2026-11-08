@@ -109,6 +109,24 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
       expect(enqueued_jobs).to be_empty
     end
 
+    it "destroys a casualty on request" do
+      report.edit_submitted!({ casualties_attributes: [ { severity: "minor" }, { severity: "severe" } ] }, user: user)
+      kept, removed = report.casualties.order(:severity).to_a
+
+      Report.find(report.id).edit_submitted!({ casualties_attributes: [ { id: removed.id, _destroy: "1" } ] }, user: user)
+
+      expect(Casualty.where(report_id: report.id)).to eq([ kept ])
+      expect(report.reload.content_revision).to eq(2)
+    end
+
+    # No rule requires a narrative text, before or after submission: an emptied text is stored as such.
+    it "accepts an emptied narrative text" do
+      report.edit_submitted!({ narrative_attributes: { raw_text: "" } }, user: user)
+
+      expect(stored_text(report)).to eq("")
+      expect(report.reload).to have_attributes(content_revision: 1, status: "submitted")
+    end
+
     it "accepts only the content of the form" do
       expect { report.edit_submitted!({ status: "validated" }, user: user) }.to raise_error(ArgumentError)
       expect { report.edit_submitted!({ narrative_attributes: { report_id: other.id } }, user: user) }.to raise_error(ArgumentError)
