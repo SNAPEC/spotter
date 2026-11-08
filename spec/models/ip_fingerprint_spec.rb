@@ -17,6 +17,15 @@ RSpec.describe IpFingerprint do
     expect(IpFingerprint.for(request_from("203.0.113.7"))).not_to eq(IpFingerprint.for(request_from("203.0.113.8")))
   end
 
+  it "treats every address of one IPv6 /64 as one client" do
+    expect(IpFingerprint.for(request_from("2001:db8:1:2::7"))).to eq(IpFingerprint.for(request_from("2001:db8:1:2:abcd::1")))
+    expect(IpFingerprint.for(request_from("2001:db8:1:2::7"))).not_to eq(IpFingerprint.for(request_from("2001:db8:1:3::7")))
+  end
+
+  it "treats an IPv4-mapped IPv6 address as its IPv4 address" do
+    expect(IpFingerprint.for(request_from("::ffff:203.0.113.7"))).to eq(IpFingerprint.for(request_from("203.0.113.7")))
+  end
+
   it "is not a bare SHA-256 of the IP" do
     expect(IpFingerprint.for(request_from("203.0.113.7"))).not_to eq(Digest::SHA256.hexdigest("203.0.113.7"))
   end
