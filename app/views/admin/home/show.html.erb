@@ -1,2 +1,32 @@
 <% content_for :title, t(".title") %>
-<h1 class="text-2xl font-semibold"><%= t(".title") %></h1>
+<div class="w-full">
+  <h1 class="text-2xl font-semibold"><%= t(".title") %></h1>
+  <%= render "shared/flash" %>
+
+  <h2 class="mt-8 text-xl font-semibold"><%= t(".staff") %></h2>
+  <table class="mt-4 w-full text-left">
+    <thead>
+      <tr>
+        <th class="py-2"><%= t(".email") %></th>
+        <th class="py-2"><%= t(".role") %></th>
+        <th class="py-2"><%= t(".passkeys") %></th>
+        <th class="py-2"><span class="sr-only"><%= t(".actions") %></span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @staff.each do |user| %>
+        <tr class="border-t border-gray-200">
+          <td class="py-2"><%= user.email %></td>
+          <td class="py-2"><%= t("roles.#{user.role}") %></td>
+          <td class="py-2"><%= user.passkeys.size %></td>
+          <td class="py-2">
+            <% unless user == Current.user %>
+              <%= button_to t(".reset"), admin_user_passkey_reset_path(user),
+                form: { data: { turbo_confirm: t(".reset_confirm") } }, class: "underline cursor-pointer" %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
