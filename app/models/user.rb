@@ -37,6 +37,12 @@ class User < ApplicationRecord
     end
   end
 
+  # A rate-limit key per address that never stores the address, normalised as the email column is.
+  def self.email_fingerprint(email)
+    OpenSSL::HMAC.hexdigest("SHA256", Rails.application.key_generator.generate_key("email_fingerprint", 32),
+      email.to_s.strip.downcase)
+  end
+
   def self.sign_in_with_magic_link(token)
     user = find_by_token_for(:magic_link, token)
     user if user&.active? && user.consume_magic_link!

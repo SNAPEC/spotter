@@ -115,28 +115,48 @@ RSpec.describe "Magic link sign-in", type: :request do
     end
 
     it "allows 5 requests in 3 minutes per client, then answers 429" do
-      5.times { request_link("lea.martin@example.com") }
+      5.times { |n| request_link("personne#{n}@example.com") }
       expect(response).to have_http_status(:ok)
 
-      request_link("lea.martin@example.com")
+      request_link("personne5@example.com")
       expect(response).to have_http_status(:too_many_requests)
       expect(response.body).to include("Trop de demandes")
 
-      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.8" })
+      request_link("personne6@example.com", env: { "REMOTE_ADDR" => "203.0.113.8" })
       expect(response).to have_http_status(:ok)
 
       travel 3.minutes + 1.second do
-        request_link("lea.martin@example.com")
+        request_link("personne7@example.com")
         expect(response).to have_http_status(:ok)
       end
     end
 
-    it "keys the limit on the IP fingerprint, never on the IP" do
+    it "sends 3 links an hour per address, whatever the client, with the generic answer" do
+      3.times { |n| request_link(" Lea.Martin@example.com ", env: { "REMOTE_ADDR" => "203.0.113.#{n + 10}" }) }
+      expect(ActionMailer::Base.deliveries.size).to eq(3)
+
+      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.20" })
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Vérifiez votre boîte de réception")
+      expect(ActionMailer::Base.deliveries.size).to eq(3)
+
+      request_link("autre@example.com", env: { "REMOTE_ADDR" => "203.0.113.20" })
+      expect(ActionMailer::Base.deliveries.size).to eq(4)
+
+      travel 1.hour + 1.second do
+        request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.21" })
+        expect(ActionMailer::Base.deliveries.size).to eq(5)
+      end
+    end
+
+    it "keys the limits on fingerprints, never on the IP or the address" do
       request_link("lea.martin@example.com")
 
-      expect(keys).not_to be_empty
-      expect(keys).to all(include(IpFingerprint.for(ActionDispatch::Request.new("REMOTE_ADDR" => ip))))
+      expect(keys.size).to eq(2)
+      expect(keys.join).to include(IpFingerprint.for(ActionDispatch::Request.new("REMOTE_ADDR" => ip)))
+      expect(keys.join).to include(User.email_fingerprint("lea.martin@example.com"))
       expect(keys.join).not_to include(ip)
+      expect(keys.join).not_to include("lea.martin")
     end
   end
 
