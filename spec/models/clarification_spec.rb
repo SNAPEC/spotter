@@ -142,6 +142,33 @@ RSpec.describe Clarification, type: :model do
       expect { report.answer_clarification!("Réponse fictive.") }.to raise_error(Report::NotAllowed)
     end
 
+    it "refuses a user whose live ownership is on another report" do
+      other_report, = Report.start_draft!(mode: "confidential", user: other)
+      other_report.save_draft!(narrative_attributes: { raw_text: "Autre récit fictif." })
+      other_report.submit!
+      expect(Report.owned_by(other)).to eq([ other_report ])
+
+      expect { report.answer_clarification!("Réponse fictive.", user: other) }.to raise_error(Report::NotAllowed)
+    end
+
+    it "refuses the valid tracking code of another anonymous report" do
+      anonymous, = anonymous_with_code
+      _, other_code = anonymous_with_code
+
+      expect { anonymous.answer_clarification!("Réponse fictive.", tracking_code: other_code) }.to raise_error(Report::NotAllowed)
+      expect(anonymous.clarifications.count).to eq(1)
+    end
+
+    %i[validate! reject!].each do |decision|
+      it "refuses the anonymous declarant's own code after #{decision}, its digest being gone" do
+        anonymous, code = anonymous_with_code
+        anonymous.public_send(decision, analyst)
+        expect(anonymous.reload.tracking_code_digest).to be_nil
+
+        expect { anonymous.answer_clarification!("Réponse tardive.", tracking_code: code) }.to raise_error(Report::NotAllowed)
+      end
+    end
+
     it "refuses the author once the ownership is overdue, even before it is deleted" do
       travel_to(report.report_ownership.cutoff_on) do
         expect(ReportOwnership.where(report_id: report.id)).to exist
