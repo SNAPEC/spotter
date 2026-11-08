@@ -29,8 +29,9 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
     report.reload
   end
 
+  # A field not stated has an empty excerpt.
   def excerpts(report)
-    Analysis.where(report_id: report.id).flat_map { |analysis| analysis.proposals.values.pluck("excerpt") }.uniq
+    Analysis.where(report_id: report.id).flat_map { |analysis| analysis.proposals.values.pluck("excerpt") }.compact_blank.uniq
   end
 
   def stored_text(report)
@@ -118,7 +119,30 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
       Report.find(report.id).edit_submitted!({ casualties_attributes: [ { id: removed.id, _destroy: "1" } ] }, user: user)
 
       expect(Casualty.where(report_id: report.id)).to eq([ kept ])
-      expect(report.reload.content_revision).to eq(2)
+      expect(report.reload.content_revision).to eq(0)
+    end
+
+    it "keeps the analysis and asks for none when only what the extractor does not read changes" do
+      analysis = analyzed(report).analyses.sole
+      clear_enqueued_jobs
+
+      report.edit_submitted!({ event_type: "incident", casualties_attributes: [ { severity: "minor" } ] }, user: user)
+
+      expect(report.reload).to have_attributes(event_type: "incident", content_revision: 0, status: "in_validation")
+      expect(report.casualties.sole.severity).to eq("minor")
+      expect(Analysis.where(report_id: report.id)).to eq([ analysis ])
+      expect(enqueued_jobs).to be_empty
+    end
+
+    it "sends the report back to analysis when a debriefing answer changes" do
+      analyzed(report)
+      clear_enqueued_jobs
+
+      report.edit_submitted!({ narrative_attributes: { debrief_causes: "Cause fictive ajoutée." } }, user: user)
+
+      expect(report.reload).to have_attributes(content_revision: 1, status: "submitted")
+      expect(Analysis.where(report_id: report.id)).to be_empty
+      expect(enqueued_jobs.sole["arguments"].last).to eq(1)
     end
 
     # No rule requires a narrative text, before or after submission: an emptied text is stored as such.

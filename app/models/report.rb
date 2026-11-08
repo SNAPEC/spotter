@@ -11,6 +11,7 @@ class Report < ApplicationRecord
   class InvalidTransition < StandardError; end
   class NotAllowed < StandardError; end
   class DigestIncomplete < StandardError; end
+  class RawContentPurgeFailed < StandardError; end
 
   include Lifecycle
 
@@ -35,7 +36,7 @@ class Report < ApplicationRecord
   scope :expired_drafts, -> { where(status: "draft", draft_expires_on: ...Date.current) }
   # Anonymous reports have no one to write to: they are left alone.
   scope :awaiting_declarant_notice, -> {
-    where(mode: "confidential", status: UNDER_ANALYSIS_STATUSES, declarant_notified: false)
+    where(mode: "confidential", status: UNDER_ANALYSIS_STATUSES, declarant_notified: false, raw_content_purged: false)
       .where(id: Clarification.where(author: "analyst").select(:report_id))
   }
 
@@ -86,6 +87,15 @@ class Report < ApplicationRecord
     where(editable_until: ...Date.current).update_all(editable_until: nil)
   end
 
+  # A report whose analysis job was lost would wait for nothing. Reports carry no time of submission, so
+  # this runs once a day at a fixed hour; a job still running for a report enqueued just before is
+  # harmless, the analyzer writes once per revision.
+  def self.requeue_stalled_analyses
+    where(status: %w[submitted analyzing]).where.not(id: Analysis.select(:report_id)).find_each do |report|
+      AnalyzeReportJob.perform_later(report, report.content_revision)
+    end
+  end
+
   # Destroying under the row lock: a draft saved meanwhile has a new expiry and is kept.
   def self.purge_expired_drafts
     expired_drafts.find_each do |report|
@@ -116,6 +126,9 @@ class Report < ApplicationRecord
     raise Report::NotAllowed, "only active staff ask for clarification" unless analyst&.active_staff?
 
     with_lock do
+      # No declarant is left to answer, and the question would outlive the purge.
+      raise Report::InvalidTransition, "raw content purged" if raw_content_purged?
+
       was_awaiting = awaiting_clarification?
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do

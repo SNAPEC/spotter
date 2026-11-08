@@ -41,6 +41,7 @@ fr:
       taken: "est déjà utilisé"
       required: "doit exister"
       invalid: "n’est pas valide"
+      too_long: "est trop long (%{count} caractères au maximum)"
       record_invalid: "La validation a échoué : %{errors}"
     forbidden:
       title: "Accès refusé"
@@ -194,12 +195,25 @@ fr:
       invalid: "Ce code n’est pas valable."
       too_many_requests: "Trop d’essais. Réessayez dans quelques minutes."
   activerecord:
+    attributes:
+      narrative:
+        raw_text: "Le récit"
+        debrief_causes: "Ce qui a mené à l’événement"
+        debrief_what_worked: "Ce qui a fonctionné"
+        debrief_do_differently: "Ce que vous feriez autrement"
+        debrief_changes_made: "Ce qui a déjà changé dans votre pratique"
+        debrief_message: "Le message aux autres moniteurs"
+        free_text_answers: "Les réponses libres"
     errors:
       messages:
         record_invalid: "La validation a échoué : %{errors}"
         no_fields: "Une version sans champ ne peut pas être publiée."
         published_version: "Une version publiée de la taxonomie est immuable."
       models:
+        narrative:
+          attributes:
+            free_text_answers:
+              too_long: "comptent une réponse trop longue (%{count} caractères au maximum)"
         user:
           attributes:
             role:

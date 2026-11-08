@@ -161,6 +161,15 @@ RSpec.describe TaxonomyVersion do
       expect(version.validate_answers({ text.code => 3 }, scope: :report)).to eq([ "#{text.code}.free_text" ])
     end
 
+    it "accepts nil for a known field only when told the answer may be unstated" do
+      integer = report_fields.find_by!(kind: "integer")
+      answers = { "cause" => nil, integer.code => nil }
+
+      expect(version.validate_answers(answers, scope: :report)).to eq([ "cause.invalid_option", "#{integer.code}.not_an_integer" ])
+      expect(version.validate_answers(answers, scope: :report, allow_unstated: true)).to eq([])
+      expect(version.validate_answers({ "nope" => nil }, scope: :report, allow_unstated: true)).to eq([ "nope.unknown_field" ])
+    end
+
     it "only accepts fields of the given scope" do
       casualty_field = version.fields.find_by!(scope: "casualty")
       expect(version.validate_answers({ casualty_field.code => "x" }, scope: :report)).to eq([ "#{casualty_field.code}.unknown_field" ])

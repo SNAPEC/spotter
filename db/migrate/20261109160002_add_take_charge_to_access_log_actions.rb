@@ -4,7 +4,7 @@ class AddTakeChargeToAccessLogActions < ActiveRecord::Migration[8.1]
   end
 
   def down
-    replace_action_check(AccessLog::ACTIONS - %w[take_charge])
+    replace_action_check(%w[view ask_clarification validate reject])
   end
 
   private

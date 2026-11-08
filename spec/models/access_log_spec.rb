@@ -7,10 +7,10 @@ RSpec.describe AccessLog, type: :model do
   let(:report_id) { SecureRandom.uuid }
 
   it "records which staff member did what on which report, and nothing about an author" do
-    log = described_class.record!(user: analyst, report: Struct.new(:id).new(report_id), action: "view")
+    log = described_class.record!(user: analyst, report: Struct.new(:id).new(report_id), action: "take_charge")
 
     expect(log).to be_persisted
-    expect(log).to have_attributes(user_id: analyst.id, report_id: report_id, action: "view")
+    expect(log).to have_attributes(user_id: analyst.id, report_id: report_id, action: "take_charge")
     expect(described_class.column_names).to contain_exactly("id", "user_id", "report_id", "action", "recorded_on")
   end
 
@@ -23,18 +23,18 @@ RSpec.describe AccessLog, type: :model do
 
   it "keeps only the month of the action" do
     log = travel_to(Time.zone.local(2026, 11, 17, 14, 32)) do
-      described_class.record!(user: analyst, report: Struct.new(:id).new(report_id), action: "view")
+      described_class.record!(user: analyst, report: Struct.new(:id).new(report_id), action: "take_charge")
     end
 
     expect(log.reload.recorded_on).to eq(Date.new(2026, 11, 1))
-    expect { described_class.insert!({ user_id: analyst.id, report_id: report_id, action: "view", recorded_on: Date.new(2026, 11, 17) }) }
+    expect { described_class.insert!({ user_id: analyst.id, report_id: report_id, action: "take_charge", recorded_on: Date.new(2026, 11, 17) }) }
       .to raise_error(ActiveRecord::StatementInvalid, /access_logs_recorded_on_month_check/)
   end
 
   it "refuses a declarant: only staff read reports" do
     declarant = User.create!(email: "declarant@example.test")
 
-    expect { described_class.record!(user: declarant, report: Struct.new(:id).new(report_id), action: "view") }
+    expect { described_class.record!(user: declarant, report: Struct.new(:id).new(report_id), action: "take_charge") }
       .to raise_error(ActiveRecord::RecordInvalid)
   end
 end

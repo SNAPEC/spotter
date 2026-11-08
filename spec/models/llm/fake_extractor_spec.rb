@@ -14,8 +14,10 @@ RSpec.describe Llm::FakeExtractor do
   end
   let(:text) { "Chute fictive au deuxième point. Le reste de la séance s'est bien passé." }
 
-  it "is the configured extractor outside production, with no network" do
+  it "is the configured extractor in test and development, with no network, and never in production" do
     expect(Rails.configuration.x.llm_extractor).to be_a(described_class)
+    expect(Rails.application.config_for(:external_services, env: "development")[:llm_extractor]).to eq("Llm::FakeExtractor")
+    expect(Rails.application.config_for(:external_services, env: "production")[:llm_extractor]).to eq("Llm::UnconfiguredExtractor")
   end
 
   it "names its provider, model and prompt version" do
@@ -30,6 +32,19 @@ RSpec.describe Llm::FakeExtractor do
     expect(result["risk_factors"]["value"]).to all(be_in(%w[fatigue cold]))
     expect(result["clients_count"]["value"]).to be_a(Integer)
     expect(result.values.map { |proposal| proposal["excerpt"] }).to all(eq("Chute fictive au deuxième point."))
+  end
+
+  it "answers some fields with null and an empty excerpt when the schema allows it" do
+    nullable = schema.merge("properties" => schema["properties"].transform_values do |property|
+      value = { "anyOf" => [ property.dig("properties", "value"), { "type" => "null" } ] }
+      property.merge("properties" => property["properties"].merge("value" => value))
+    end)
+    results = 20.times.map { |index| extractor.extract(text: "Récit fictif numéro #{index}.", schema: nullable) }
+    proposals = results.flat_map(&:values)
+
+    expect(proposals.select { |proposal| proposal["value"].nil? }).to be_present.and(all(include("excerpt" => "")))
+    expect(results.pluck("weather").pluck("value").compact).to all(be_in(%w[good rain wind]))
+    expect(results.pluck("clients_count").pluck("value").compact).to all(be_a(Integer))
   end
 
   it "gives the same answer for the same text" do

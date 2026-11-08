@@ -2,6 +2,8 @@ module Report::Lifecycle
   extend ActiveSupport::Concern
 
   OWNERSHIP_DAYS = 60
+  # A report still undecided this long after its submission month loses its raw content all the same.
+  RAW_CONTENT_DAYS = 180
   DECIDED_STATUSES = %w[validated rejected].freeze
   UNDER_ANALYSIS_STATUSES = %w[submitted analyzing in_validation].freeze
 
@@ -11,6 +13,10 @@ module Report::Lifecycle
     end
 
     scope :decided, -> { where(status: DECIDED_STATUSES) }
+    # submitted_on is the first of the month: counting from it, the purge never comes later than RAW_CONTENT_DAYS.
+    scope :raw_content_overdue, -> {
+      where(status: UNDER_ANALYSIS_STATUSES, raw_content_purged: false, submitted_on: ..(Date.current - RAW_CONTENT_DAYS))
+    }
     validate :status_changes_through_lifecycle
   end
 
@@ -33,9 +39,10 @@ module Report::Lifecycle
   end
 
   # The declarant may correct a submitted report until staff take it in charge, and while the authorship
-  # link would still be live (editable_until is the day before its cutoff), in both modes. The analyses go: their
-  # excerpts quote the old text. The new revision makes a run still working on the old text write
-  # nothing. Ownership cutoff, tracking code and submission month stay as submit! set them.
+  # link would still be live (editable_until is the day before its cutoff), in both modes. A change to the
+  # text the extractor reads sends the report back to analysis: the analyses go, their excerpts quote the
+  # old text, and the new revision makes a run still working on the old text write nothing. Ownership
+  # cutoff, tracking code and submission month stay as submit! set them.
   # Authorisation comes before any state check, so a stranger learns nothing about the report.
   def edit_submitted!(attrs, user: nil, tracking_code: nil)
     attrs = form_content(attrs)
@@ -44,11 +51,16 @@ module Report::Lifecycle
       raise Report::NotAllowed, "not the declarant of this report" unless declarant?(user: user, tracking_code: tracking_code)
       raise Report::InvalidTransition, "cannot edit a #{status} report" unless under_analysis?
       raise Report::InvalidTransition, "already taken in charge" if taken_in_charge?
+      raise Report::InvalidTransition, "raw content purged" if raw_content_purged?
       raise Report::InvalidTransition, "editing window closed" unless editable_until && editable_until >= Date.current
 
+      analyzer = Report::Analyzer.new
+      analyzed_text = analyzer.text_of(self)
       assign_attributes(attrs)
-      # A form sent back unchanged keeps its analysis rather than queue a new one for the same text.
+      # A form sent back unchanged writes nothing.
       next unless changed_for_autosave?
+      # Coded fields, casualties and free-text answers never reach the extractor: they keep the analysis.
+      next save! if analyzer.text_of(self) == analyzed_text
 
       self.content_revision += 1
       through_lifecycle do
@@ -102,6 +114,33 @@ module Report::Lifecycle
 
   def reject!(analyst)
     decide!(analyst, from: UNDER_ANALYSIS_STATUSES, to: "rejected", action: "reject")
+  end
+
+  class_methods do
+    # One report that cannot be purged must not keep the others' content: it is reported, by error class
+    # and id only (a message may quote the narrative), and tried again the next day.
+    def purge_overdue_raw_content
+      raw_content_overdue.find_each do |report|
+        report.purge_overdue_raw_content!
+      rescue StandardError => error
+        Rails.error.report(Report::RawContentPurgeFailed.new("#{error.class.name} on report #{report.id}"), handled: true)
+      end
+    end
+  end
+
+  # Same purge as a decision, status left as is: the analyst can still code the report by hand and decide.
+  # Checked again under the row lock, so a report decided meanwhile is left alone.
+  def purge_overdue_raw_content!
+    with_lock do
+      next unless Report.raw_content_overdue.exists?(id)
+
+      purge_raw_content
+      # The status stays: a new revision makes an analysis still running on the purged text write
+      # nothing, its excerpts would bring the text back. A decision changes the status instead.
+      self.content_revision += 1
+      # Only purge flags change here: a report whose content no longer passes the current checks is purged all the same.
+      save!(validate: false)
+    end
   end
 
   def under_analysis?
@@ -160,7 +199,7 @@ module Report::Lifecycle
       transition!(from: from, to: to) do
         AccessLog.record!(user: analyst, report: self, action: action)
         close_editing
-        purge_after_decision!
+        purge_raw_content
       end
     end
 
@@ -175,14 +214,19 @@ module Report::Lifecycle
       end
     end
 
-    # Everything that could point back to the author or quote them goes, in one transaction. Free-text
-    # answers, clarifications and the extractor's excerpts go too: only coded answers are kept.
-    # taken_in_charge stays: it says nothing of the author, and every decided report was taken in charge.
-    def purge_after_decision!
+    # Everything that could point back to the author or quote them goes, in the caller's transaction.
+    # Free-text answers, clarifications and the extractor's excerpts go too: only coded answers are kept.
+    # taken_in_charge stays: it says nothing of the author. The caller saves the report.
+    def purge_raw_content
       narrative&.purge_raw!
       clarifications.destroy_all
       analyses.each(&:strip_raw_excerpts!)
+      # A row's xmin is the id of the transaction that last wrote it, and ids grow with time: left as is,
+      # a casualty would date the declarant's last entry. The no-op write stamps it with the purge's.
+      casualties.update_all("severity = severity")
       report_ownership&.destroy!
-      assign_attributes(tracking_code_digest: nil, draft_token_digest: nil, declarant_notified: false)
+      assign_attributes(
+        tracking_code_digest: nil, draft_token_digest: nil, declarant_notified: false, editable_until: nil, raw_content_purged: true
+      )
     end
 end

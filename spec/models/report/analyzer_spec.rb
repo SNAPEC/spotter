@@ -63,13 +63,34 @@ RSpec.describe Report::Analyzer, type: :model do
       expect(schema).to include("additionalProperties" => false, "required" => schema["properties"].keys)
       schema["properties"].each_value do |property|
         expect(property).to include("additionalProperties" => false, "required" => %w[value excerpt])
+        expect(property.dig("properties", "value", "anyOf")).to include({ "type" => "null" })
       end
+    end
+
+    it "stores a field the extractor says is not stated, with an empty excerpt" do
+      extractor = Llm::FakeExtractor.new
+      extractor.define_singleton_method(:extract) do |text:, schema:|
+        super(text: text, schema: schema).merge("weather" => { "value" => nil, "excerpt" => "" })
+      end
+
+      analysis = analyze(extractor)
+
+      expect(Analysis.find(analysis.id).proposals["weather"]).to eq("value" => nil, "excerpt" => "")
+      expect(report.reload).to be_in_validation
+    end
+
+    it "gets some fields not stated from the fake extractor, every other one with a valid value" do
+      proposals = analyze.proposals
+
+      expect(proposals.values.pluck("value")).to include(nil)
+      expect(proposals.values.select { |proposal| proposal["value"].nil? }.pluck("excerpt")).to all(eq(""))
     end
 
     {
       "an extra key" => ->(proposals) { proposals["weather"]["quote"] = "Chute fictive au deuxième point" },
       "a non-string excerpt" => ->(proposals) { proposals["weather"]["excerpt"] = [ "Chute fictive" ] },
       "a missing excerpt" => ->(proposals) { proposals["weather"].delete("excerpt") },
+      "a missing value" => ->(proposals) { proposals["weather"].delete("value") },
       "a missing field" => ->(proposals) { proposals.delete("weather") },
       "a proposal that is not an object" => ->(proposals) { proposals["weather"] = "good" }
     }.each do |label, tamper|

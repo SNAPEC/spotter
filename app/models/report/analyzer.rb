@@ -18,6 +18,8 @@ class Report::Analyzer
   def call(report, revision:)
     existing = analysis_of(report)
     return existing if existing
+    # Nothing left to read: the analyst codes the report by hand.
+    return record_failure(report, revision: revision) if report.raw_content_purged?
 
     report.with_lock { report.start_analysis! if report.submitted? && report.content_revision == revision }
     return unless report.analyzing? && report.content_revision == revision
@@ -26,10 +28,10 @@ class Report::Analyzer
     proposals = extract(report, fields)
     check!(report, proposals, fields)
 
-    # The declarant may have edited the report while the extractor ran: proposals and excerpts would
-    # then describe a text that no longer exists.
+    # The declarant may have edited the report, or its raw content been purged, while the extractor
+    # ran: proposals and excerpts would then quote a text that no longer exists.
     report.with_lock do
-      next analysis_of(report) unless report.analyzing? && report.content_revision == revision
+      next analysis_of(report) unless report.analyzing? && report.content_revision == revision && !report.raw_content_purged?
 
       analysis = report.analyses.create!(
         provider: @extractor.provider, model: @extractor.model, prompt_version: @extractor.prompt_version, proposals: proposals
@@ -37,6 +39,9 @@ class Report::Analyzer
       report.ready_for_validation!
       analysis
     end
+  rescue Llm::UnconfiguredExtractor::NotConfigured
+    # No point in trying again: the analyst codes the report by hand right away.
+    record_failure(report, revision: revision)
   end
 
   # When the extractor fails for good, the analyst codes the report by hand: a failed analysis takes
@@ -59,24 +64,27 @@ class Report::Analyzer
     end
   end
 
+  # What the extractor reads of a report, unsaved changes included: only a change here calls for a new analysis.
+  def text_of(report)
+    narrative = report.narrative
+    return "" unless narrative
+
+    [ narrative.raw_text, *Narrative::DEBRIEF_FIELDS.map { |field| narrative[field] } ].compact_blank.join("\n\n")
+  end
+
   private
     # The extractor's own error may quote the narrative (an echoed request, a provider message): it must
     # not reach the failed jobs table nor Sentry, so it is replaced, cause included.
     def extract(report, fields)
       @extractor.extract(text: text_of(report), schema: schema_for(fields))
+    rescue Llm::UnconfiguredExtractor::NotConfigured
+      raise
     rescue StandardError
       raise ExtractionFailed, "extractor failed", cause: nil
     end
 
     def analysis_of(report)
       report.analyses.find_by(prompt_version: @extractor.prompt_version)
-    end
-
-    def text_of(report)
-      narrative = report.narrative
-      return "" unless narrative
-
-      [ narrative.raw_text, *Narrative::DEBRIEF_FIELDS.map { |field| narrative[field] } ].compact_blank.join("\n\n")
     end
 
     def schema_for(fields)
@@ -86,7 +94,8 @@ class Report::Analyzer
         when "multi" then { "type" => "array", "items" => { "enum" => field.options.map(&:code) } }
         when "integer" then { "type" => "integer", "minimum" => 0 }
         end
-        [ field.code, closed_object("value" => value, "excerpt" => { "type" => "string" }) ]
+        # null is the extractor's "not stated": better than a guess, and the excerpt is then empty.
+        [ field.code, closed_object("value" => { "anyOf" => [ value, { "type" => "null" } ] }, "excerpt" => { "type" => "string" }) ]
       end
       closed_object(properties)
     end
@@ -107,7 +116,8 @@ class Report::Analyzer
       end
       raise InvalidProposals, "malformed: #{malformed.keys.join(", ")}" if malformed.any?
 
-      codes = report.taxonomy_version.validate_answers(proposals.transform_values { |proposal| proposal["value"] }, scope: :report)
+      values = proposals.transform_values { |proposal| proposal["value"] }
+      codes = report.taxonomy_version.validate_answers(values, scope: :report, allow_unstated: true)
       raise InvalidProposals, codes.join(", ") if codes.any?
     end
 end

@@ -12,19 +12,25 @@
 production:
   purge_expired_sessions:
     class: PurgeExpiredSessionsJob
-    schedule: every day at 3am
+    schedule: every day at 3am Europe/Paris
   cut_ownerships:
     class: CutOwnershipsJob
-    schedule: every day at 3am
+    schedule: every day at 3am Europe/Paris
   close_expired_edit_windows:
     class: CloseExpiredEditWindowsJob
-    schedule: every day at 3am
+    schedule: every day at 3am Europe/Paris
+  purge_overdue_raw_content:
+    class: PurgeOverdueRawContentJob
+    schedule: every day at 3am Europe/Paris
+  requeue_stalled_analyses:
+    class: RequeueStalledAnalysesJob
+    schedule: every day at 4am Europe/Paris
   purge_expired_drafts:
     class: PurgeExpiredDraftsJob
-    schedule: every day at 3am
+    schedule: every day at 3am Europe/Paris
   purge_unused_accounts:
     class: PurgeUnusedAccountsJob
-    schedule: every day at 3am
+    schedule: every day at 3am Europe/Paris
   # Weekly, so a digest's time in the mail provider's log points to a week of questions, not to one.
   clarification_digest:
     class: ClarificationDigestJob

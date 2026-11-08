@@ -80,14 +80,18 @@ class TaxonomyVersion < ApplicationRecord
   end
 
   # Codes are "<field>.<error>": unknown_field, invalid_option, duplicate_option, not_a_list, free_text,
-  # not_an_integer, out_of_range; "answers.not_a_hash" when answers is not a Hash.
-  def validate_answers(answers, scope:)
+  # not_an_integer, out_of_range; "answers.not_a_hash" when answers is not a Hash. allow_unstated lets a
+  # known field be nil, the extractor's "not stated".
+  def validate_answers(answers, scope:, allow_unstated: false)
     return [ "answers.not_a_hash" ] unless answers.is_a?(Hash)
 
     fields_by_code = fields.where(scope: scope.to_s).includes(:options).index_by(&:code)
     answers.flat_map do |code, value|
       field = fields_by_code[code.to_s]
-      field ? answer_errors(field, value) : [ "#{code}.unknown_field" ]
+      next [ "#{code}.unknown_field" ] unless field
+      next [] if value.nil? && allow_unstated
+
+      answer_errors(field, value)
     end
   end
 
