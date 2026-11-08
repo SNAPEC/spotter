@@ -38,7 +38,12 @@ module Authentication
       session.delete(:return_to_after_authenticating) || root_url
     end
 
+    # A fresh Rails session defeats fixation; only the return URL survives it.
     def start_new_session_for(user)
+      return_to = session[:return_to_after_authenticating]
+      reset_session
+      session[:return_to_after_authenticating] = return_to if return_to
+
       user.sessions.create!.tap do |session|
         Current.session = session
         cookies.signed.permanent[:session_id] = { value: session.id, httponly: true, same_site: :lax }

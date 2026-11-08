@@ -46,6 +46,18 @@ RSpec.describe "Magic link sign-in", type: :request do
     expect(signed_in_user).to eq(user)
   end
 
+  it "starts a fresh Rails session at sign-in to prevent session fixation" do
+    request_link("lea.martin@example.com")
+    path = link_path_from_last_email
+    post "#{path}x"
+    session_before = session.id.public_id
+
+    post path
+
+    expect(signed_in_user).to eq(user)
+    expect(session.id.public_id).not_to eq(session_before)
+  end
+
   it "does not sign in on the GET alone, so mail scanners cannot burn the link" do
     request_link("lea.martin@example.com")
 
