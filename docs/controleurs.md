@@ -47,7 +47,7 @@ Puis ne transmettre au modèle que l'identité qui correspond au mode du rapport
 | --- | --- |
 | `ActiveRecord::RecordInvalid` | Réafficher le formulaire en 422 (`:unprocessable_entity`) avec `error.record.errors`. Turbo exige 422 pour afficher un formulaire refusé. |
 | `ActiveRecord::RecordNotFound` | 404 (comportement par défaut de Rails, ne pas l'intercepter). |
-| `Report::NotAllowed` | 404 aussi, comme un rapport inexistant : un refus ne doit pas confirmer qu'un rapport existe. |
+| `Report::NotAllowed` | Côté déclarant : 404, comme un rapport inexistant, car un refus ne doit pas confirmer qu'un rapport existe. Côté équipe (compte qui n'est plus actif) : 403. |
 | `Report::InvalidTransition` | Redirection 303 vers la fiche du rapport avec un message (le rapport a changé d'état entre l'affichage et l'envoi : brouillon expiré, rapport pris en charge entre-temps…). |
 | `ArgumentError` venu du modèle (« not draft content ») | Ne pas l'intercepter : c'est un `permit` trop large, une erreur de programmation. |
 | `User::PasskeyResetNotAllowed`, `User::DeactivationNotAllowed`, `User::TooFewAdmins` | Redirection 303 avec un message, comme dans `Admin::DeactivationsController`. |
@@ -76,6 +76,7 @@ params.expect(report: [
 Le jeton de brouillon anonyme, le code de suivi, les codes de secours et le code d'enrôlement ne sont stockés qu'en empreinte : la méthode du modèle les renvoie en clair une seule fois.
 
 - Les afficher dans la réponse même de l'action qui les crée, avec `response.headers["Cache-Control"] = "no-store"` (voir `Admin::PasskeyResetsController`). Jamais dans le flash, l'URL ou un paramètre de redirection.
+- `no-store` n'arrête pas le cache de Turbo : ajouter aussi `<meta name="turbo-cache-control" content="no-cache">` dans le `<head>` de ces pages (`content_for :head`), sinon le code réapparaît au retour arrière.
 - Le jeton de brouillon va dans un cookie chiffré, `httponly`, `same_site: :lax`, qui expire avec le brouillon, et qui est supprimé à la soumission.
 - Le code de suivi ne passe jamais dans une URL (logs, historique du navigateur) : il est saisi dans un formulaire en POST, sous le nom `tracking_code`.
 
@@ -83,7 +84,7 @@ Le jeton de brouillon anonyme, le code de suivi, les codes de secours et le code
 
 Toute action qui envoie un mail, appelle le LLM ou vérifie un secret porte un `rate_limit` :
 
-- clé : `Current.user.id` si connecté, `IpFingerprint.for(request)` sinon. Jamais `request.remote_ip` : aucune IP n'est stockée, et le cache des limites est en base ;
+- clé : `Current.user.id` pour une action liée à un compte ; `IpFingerprint.for(request)` pour toute action liée à un rapport anonyme, **même si la personne est connectée** (sinon le cache des limites, en base, associerait un compte à une activité anonyme). Jamais `request.remote_ip` : aucune IP n'est stockée ;
 - `store: Rails.configuration.x.rate_limit_store || cache_store`, comme les contrôleurs existants ;
 - obligatoire sur la modification après envoi (chaque modification du texte relance le LLM) et sur la saisie du code de suivi.
 

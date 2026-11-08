@@ -9,7 +9,7 @@ bin/rubocop                       # style
 bin/brakeman --no-pager -q        # sécurité
 ```
 
-Le hook installé par `scripts/ci/install-hooks.sh` lance Brakeman et bundler-audit avant chaque push ; la CI relance tout.
+Le hook installé par `scripts/ci/install-hooks.sh` tourne avant chaque push, selon les fichiers touchés : gitleaks, RuboCop, Brakeman (si `app/`, `config/` ou `lib/` changent), bundler-audit (si `Gemfile.lock` change). La CI relance tout.
 
 ## Données
 
@@ -45,7 +45,7 @@ Voir `spec/requests/authorization_spec.rb`.
 ## Temps et jobs
 
 - Les échéances se testent avec `travel_to(Date.new(2026, 11, 17)) { … }` (dates fictives).
-- Un job se teste par ses effets : `perform_enqueued_jobs { … }`, puis l'état de la base. Pas de test qui vérifie seulement qu'un job a été mis en file.
+- Un job se teste par ses effets : `perform_enqueued_jobs { … }` (avec `include ActiveJob::TestHelper` dans la spec, comme `no_ip_anywhere_spec.rb`), puis l'état de la base. Pas de test qui vérifie seulement qu'un job a été mis en file.
 
 ## Interdits
 

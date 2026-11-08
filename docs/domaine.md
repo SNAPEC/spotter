@@ -11,11 +11,11 @@
 | `Narrative` | Récit et cinq réponses de débriefing, réponses libres de la taxonomie | Tout est chiffré et supprimé à la décision. Un seul par rapport. |
 | `Casualty` | Une personne blessée ou concernée | Gravité en colonne, le reste dans `answers` (taxonomie, portée `casualty`). Plusieurs par rapport. |
 | `ReportOwnership` | **Le seul lien** entre un rapport et son auteur | `user_ref` chiffré, date de coupure. Supprimé à la décision ou à la coupure. |
-| `Analysis` | Les propositions de l'extracteur (LLM) | Une par version de prompt. `proposals` : `{ code => { "value" => …, "excerpt" => "…" } }`, chiffré. `status` : `proposed` ou `failed`. |
+| `Analysis` | Les propositions de l'extracteur (LLM) | Une par version de prompt. `proposals` : `{ code => { "value" => …, "excerpt" => "…" } }`, chiffré. `status` : `proposed` ou `failed` (`reviewed` existe, pas encore utilisé). |
 | `Clarification` | Un message du fil entre analyste et déclarant | Corps chiffré, `author` (`analyst`, `declarant`), `position`. Supprimé à la décision. |
 | `TaxonomyVersion`, `TaxonomyField`, `TaxonomyOption` | La taxonomie versionnée | Une version publiée est immuable. `TaxonomyVersion.current` est la dernière publiée. |
 | `AccessLog` | Quel membre de l'équipe a agi sur quel rapport | Au mois près. Écrit par les méthodes du modèle, jamais par un contrôleur. |
-| `AuditEvent` | Actions d'administration | Réinitialisation de passkeys, code d'enrôlement, désactivation. |
+| `AuditEvent` | Actions d'administration | Réinitialisation de passkeys, code d'enrôlement, désactivation, passkey enregistrée après un code de secours. |
 
 ### Où vont les réponses du formulaire
 
@@ -59,9 +59,9 @@ Tout est automatique et identique pour tous : aucun écran ne doit permettre de 
 | Brouillon | 30 jours sans enregistrement | `PurgeExpiredDraftsJob`, chaque nuit |
 | `ReportOwnership` (lien vers l'auteur) | Décision, ou 60 jours après la soumission | La décision, `CutOwnershipsJob` |
 | `editable_until` (la fenêtre de modification) | Prise en charge, question, décision, ou fin des 60 jours | Ces méthodes, `CloseExpiredEditWindowsJob` |
-| Récit, débriefing, réponses libres, fil, extraits du LLM, code de suivi | Décision, ou 180 jours après le mois de soumission sans décision | La décision, `PurgeOverdueRawContentJob` |
+| Récit, débriefing, réponses libres, fil, extraits du LLM, code de suivi | Décision, ou 180 jours après le 1er du mois de soumission sans décision (donc parfois 150 jours après l'envoi réel) | La décision, `PurgeOverdueRawContentJob` |
 | Sessions expirées | Le lendemain de l'expiration | `PurgeExpiredSessionsJob` |
-| Comptes déclarants inutilisés | 30 jours sans connexion, ou 12 mois après la dernière session, arrondi au trimestre | `PurgeUnusedAccountsJob` |
+| Comptes déclarants inutilisés | Jamais connecté : fin du trimestre qui suit J+30 après la création. Sinon : fin du trimestre qui suit l'expiration de la dernière session + 12 mois. Jamais tant qu'une session existe, qu'un lien d'auteur vit, ou qu'un `AccessLog` ou un `AuditEvent` cite le compte. | `PurgeUnusedAccountsJob` |
 
 Après la purge du brut, `raw_content_purged?` est vrai et il ne reste que les réponses codées. Les modèles rattachés (`Narrative`, `Clarification`, `Casualty`, `Analysis`) sont en lecture seule une fois le rapport décidé. Après 180 jours sans décision, le statut ne bouge pas : l'analyste peut encore coder à la main et décider.
 
@@ -75,7 +75,8 @@ Les tâches tournent la nuit (3 h et 4 h, heure de Paris), le récapitulatif aux
 | Retrouver le brouillon | `Report.owned_by(Current.user)` | `Report.find_draft_by_token(jeton du cookie)` |
 | Retrouver le rapport soumis | `Report.owned_by(Current.user)`, tant que le lien vit | `Report.find_by_tracking_code(code)` |
 | Prouver qu'on est le déclarant | `user: Current.user` | `tracking_code: code` |
-| Être prévenu d'une question | Mail neutre hebdomadaire, sans contenu | Revenir avec son code de suivi |
+| Être prévenu d'une question | Mail neutre hebdomadaire, sans contenu, tant que le lien vit et que le compte est actif | Revenir avec son code de suivi |
+| Rapport introuvable pour le déclarant | À la décision ou 60 jours après la soumission | À la décision ou à la purge des 180 jours |
 
 Les méthodes qui prennent `user:` et `tracking_code:` attendent l'un **ou** l'autre selon le mode, jamais les deux : passer les deux est un refus.
 

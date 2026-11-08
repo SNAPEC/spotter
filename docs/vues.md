@@ -21,7 +21,7 @@ La politique est stricte et appliquée (`config/initializers/content_security_po
 - Toute l'interface est en français dans `config/locales/fr.yml`, avec des clés en anglais. Dans une vue, la recherche paresseuse : `t(".title")` sous `fr.<contrôleur>.<action>.title`.
 - Libellés des champs et messages d'erreur des modèles : `fr.activerecord.attributes` et `fr.activerecord.errors`.
 - Les libellés de la taxonomie viennent de la base (`TaxonomyField#label`, `TaxonomyOption#label`, `definition`), pas des fichiers de traduction.
-- Les noms de mois manquent : `l(report.submitted_on, format: "%B %Y")` échoue tant que `fr.date.month_names` n'est pas dans `fr.yml`. Les ajouter là, sans gemme.
+- Les noms de mois manquent : `l(report.submitted_on, format: "%B %Y")` affiche « Translation missing: fr.date.month_names » **sans lever d'erreur** (une spec ne le voit pas) tant que `fr.date.month_names` n'est pas dans `fr.yml`. Les ajouter là, sans gemme.
 - Typographie : apostrophe courbe (’), espaces insécables avant `:`, `;`, `?`, `!` comme dans les clés existantes.
 
 ## Composants et jetons
@@ -56,5 +56,5 @@ L'outil se remplit sur un téléphone, souvent le soir après une sortie, parfoi
 
 - Quoi que ce soit qui relie un rapport à son auteur dans un écran de l'équipe (e-mail, compte, `ReportOwnership`).
 - Une date plus précise que le mois pour un rapport.
-- Un code de suivi, un jeton ou un code de secours ailleurs que dans la réponse qui le crée.
+- Un code de suivi, un jeton ou un code de secours ailleurs que dans la réponse qui le crée (avec `no-store` et `turbo-cache-control`, voir [Contrôleurs](controleurs.md#secrets-montrés-une-fois)).
 - Le contenu d'un rapport dans un mail : les mails restent neutres, avec un lien vers `/login`.

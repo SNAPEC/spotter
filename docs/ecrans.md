@@ -27,6 +27,7 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 - Retrouver le brouillon : `Report.owned_by(Current.user).find(params[:id])` en confidentiel ; `Report.find_draft_by_token(cookies.encrypted[:draft_token])` en anonyme.
 - Afficher les champs de `report.taxonomy_version.fields`, groupés par `group`, dans l'ordre de `position`, avec `field.options` (`code`, `label`, `definition`). Composants : `components/choice_cards` (single, multi), `components/text_field`, `components/steps`.
 - Enregistrer chaque étape : `report.save_draft!(report_params)` avec le `params.expect` de [Contrôleurs](controleurs.md#paramètres). Chaque enregistrement repousse l'expiration de 30 jours.
+- **Attention :** `answers` et `free_text_answers` sont remplacés en entier à chaque enregistrement, et les champs de `answers` se répartissent sur plusieurs étapes. Une étape qui ne poste que ses propres champs efface ceux des autres. Tant que le modèle ne fusionne pas par étape (voir la fin de cette page), chaque étape doit renvoyer tout le hash, en champs cachés pour les réponses des autres étapes.
 - Récit : `narrative_attributes[raw_text]`, 20 000 caractères au plus ; chaque débrief et chaque réponse libre : 5 000.
 - Victimes : `casualties_attributes`, une entrée par personne, `_destroy` pour en retirer une.
 - Erreurs : `RecordInvalid` → 422 avec `report.errors` (les codes de `answers` sont dans les détails de l'erreur : `"<champ>.<erreur>"`) ; `InvalidTransition` (brouillon expiré ou déjà soumis) → redirection vers Mes RETEX avec un message ; `RecordNotFound` → 404.
@@ -44,12 +45,13 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 - Confidentiel : `Report.owned_by(Current.user).find(params[:id])`.
 - Anonyme : un formulaire demande le code de suivi (`POST`, champ `tracking_code`, `rate_limit` par `IpFingerprint.for(request)`), puis `Report.find_by_tracking_code(params[:tracking_code])`. Code faux → même message que « introuvable ». La page affichée porte `Cache-Control: no-store` et garde le code dans un champ caché des formulaires qui suivent (réponse, modification) : il n'est stocké nulle part ailleurs.
 - Afficher : `status`, `report.clarifications` (dans l'ordre, `author` et `body`), le formulaire de réponse si `awaiting_clarification?`, le lien de modification si le rapport est encore modifiable.
-- Après la décision, `raw_content_purged?` est vrai : le fil et le récit ont disparu. L'afficher sans laisser croire à une panne.
+- Le rapport devient introuvable pour le déclarant : en confidentiel à la décision ou 60 jours après la soumission (le lien est coupé), en anonyme à la décision ou à la purge des 180 jours (le code de suivi est effacé). La page de saisie du code doit le dire, pour qu'un code « qui ne marche plus » ne passe pas pour une erreur.
 
 ### Répondre à une question
 
 - `report.answer_clarification!(body, user: Current.user)` en confidentiel, `report.answer_clarification!(body, tracking_code: params[:tracking_code])` en anonyme.
-- Erreurs : `RecordInvalid` (corps vide) → 422 ; `NotAllowed` → 404 ; `InvalidTransition` (aucune question ouverte, rapport décidé) → redirection avec un message.
+- Le modèle exige seulement qu'une question de l'analyste existe dans le fil : le déclarant peut répondre plusieurs fois de suite. Afficher le formulaire selon `awaiting_clarification?` reste le choix de l'écran.
+- Erreurs : `RecordInvalid` (corps vide) → 422 ; `NotAllowed` → 404 ; `InvalidTransition` (aucune question de l'analyste dans le fil, rapport décidé) → redirection avec un message.
 
 ### Modifier après envoi
 
@@ -75,11 +77,11 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 - Ne jamais afficher ni chercher qui est l'auteur. `ReportOwnership` n'a rien à faire dans une vue de l'équipe.
 - Actions, chacune un formulaire en `POST` vers une action qui appelle une méthode :
   - Prendre en charge : `report.take_charge!(Current.user)`. Ferme la modification par le déclarant. Idempotent.
-  - Poser une question : `report.ask_clarification!(Current.user, body)`. Aucun mail sur le moment ; le déclarant confidentiel reçoit un mail neutre le lundi suivant.
+  - Poser une question : `report.ask_clarification!(Current.user, body)`. Aucun mail sur le moment ; le déclarant confidentiel reçoit un mail neutre le lundi suivant, seulement si le lien vit encore et si son compte est actif. Après les 60 jours, le déclarant ne retrouve plus le rapport et ne peut plus répondre : l'écran doit le signaler à l'analyste avant qu'il pose la question. Le modèle n'expose pas encore cette information (voir la fin de cette page).
   - Valider : `report.validate!(Current.user)`, seulement depuis `in_validation`.
   - Rejeter : `report.reject!(Current.user)`, depuis tout statut sous analyse.
 - Valider et rejeter suppriment le récit, le fil et le lien vers l'auteur, sans retour possible : demander confirmation (`data-turbo-confirm`, ou le contrôleur Stimulus `confirm` pour un formulaire sans Turbo).
-- Erreurs : `NotAllowed` (compte désactivé entre-temps) → 403 ; `InvalidTransition` → redirection vers la fiche avec un message ; `RecordInvalid` (question vide) → 422.
+- Erreurs : `NotAllowed` (compte désactivé entre-temps, cas rare : sa session est déjà refusée) → 403, voir [Contrôleurs](controleurs.md#erreurs-et-codes-http) ; `InvalidTransition` → redirection vers la fiche avec un message ; `RecordInvalid` (question vide) → 422.
 
 ## Administration (`/admin`)
 
@@ -96,7 +98,9 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 3. **Les valeurs du formulaire.** Un formulaire envoie des chaînes : un champ `integer` arrive en `"3"`, refusé (`not_an_integer`) ; un choix laissé vide arrive en `""`, refusé (`invalid_option`). Il faut convertir et nettoyer dans le modèle avant la validation.
 4. **« Encore modifiable ? »** Pas de prédicat pour afficher ou non le lien de modification. La condition est dans `edit_submitted!` ; une méthode publique du modèle doit la porter, pas la vue.
 5. **Un brouillon complet.** `submit!` accepte un brouillon vide. Quels champs sont obligatoires avant l'envoi ?
-6. **Le nombre de victimes.** Aucune limite (le formulaire AN3S en prévoit trois).
+6. **Le nombre de victimes.** Aucune limite.
 7. **La fin d'adhésion** déclarée par le moniteur : aucune méthode.
 8. **Changer un rôle**, nommer un analyste : aucune méthode (la règle des deux admins est déjà dans la validation de `User`).
 9. **Les statistiques** : aucune requête.
+10. **L'enregistrement par étape.** `save_draft!` remplace `answers` et `free_text_answers` en entier ; une fusion par étape dans le modèle éviterait de renvoyer tout le hash à chaque étape.
+11. **« Le déclarant peut-il encore répondre ? »** Pour l'analyste : lien vivant en confidentiel, code de suivi présent en anonyme. Aucune méthode ne l'expose, et l'écran ne doit pas lire `ReportOwnership` lui-même.
