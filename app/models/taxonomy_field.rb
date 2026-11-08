@@ -18,7 +18,7 @@ class TaxonomyField < ApplicationRecord
   def refuse_if_published
     return unless taxonomy_version.published?
 
-    errors.add(:base, "published taxonomy versions are immutable")
+    errors.add(:base, :published_version)
     throw :abort
   end
 end
