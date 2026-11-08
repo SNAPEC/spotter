@@ -59,6 +59,14 @@ class Report::Analyzer
     end
   end
 
+  # What the extractor reads of a report, unsaved changes included: only a change here calls for a new analysis.
+  def text_of(report)
+    narrative = report.narrative
+    return "" unless narrative
+
+    [ narrative.raw_text, *Narrative::DEBRIEF_FIELDS.map { |field| narrative[field] } ].compact_blank.join("\n\n")
+  end
+
   private
     # The extractor's own error may quote the narrative (an echoed request, a provider message): it must
     # not reach the failed jobs table nor Sentry, so it is replaced, cause included.
@@ -70,13 +78,6 @@ class Report::Analyzer
 
     def analysis_of(report)
       report.analyses.find_by(prompt_version: @extractor.prompt_version)
-    end
-
-    def text_of(report)
-      narrative = report.narrative
-      return "" unless narrative
-
-      [ narrative.raw_text, *Narrative::DEBRIEF_FIELDS.map { |field| narrative[field] } ].compact_blank.join("\n\n")
     end
 
     def schema_for(fields)

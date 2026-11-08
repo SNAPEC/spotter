@@ -33,9 +33,10 @@ module Report::Lifecycle
   end
 
   # The declarant may correct a submitted report until staff take it in charge, and while the authorship
-  # link would still be live (editable_until is the day before its cutoff), in both modes. The analyses go: their
-  # excerpts quote the old text. The new revision makes a run still working on the old text write
-  # nothing. Ownership cutoff, tracking code and submission month stay as submit! set them.
+  # link would still be live (editable_until is the day before its cutoff), in both modes. A change to the
+  # text the extractor reads sends the report back to analysis: the analyses go, their excerpts quote the
+  # old text, and the new revision makes a run still working on the old text write nothing. Ownership
+  # cutoff, tracking code and submission month stay as submit! set them.
   # Authorisation comes before any state check, so a stranger learns nothing about the report.
   def edit_submitted!(attrs, user: nil, tracking_code: nil)
     attrs = form_content(attrs)
@@ -46,9 +47,13 @@ module Report::Lifecycle
       raise Report::InvalidTransition, "already taken in charge" if taken_in_charge?
       raise Report::InvalidTransition, "editing window closed" unless editable_until && editable_until >= Date.current
 
+      analyzer = Report::Analyzer.new
+      analyzed_text = analyzer.text_of(self)
       assign_attributes(attrs)
-      # A form sent back unchanged keeps its analysis rather than queue a new one for the same text.
+      # A form sent back unchanged writes nothing.
       next unless changed_for_autosave?
+      # Coded fields, casualties and free-text answers never reach the extractor: they keep the analysis.
+      next save! if analyzer.text_of(self) == analyzed_text
 
       self.content_revision += 1
       through_lifecycle do
