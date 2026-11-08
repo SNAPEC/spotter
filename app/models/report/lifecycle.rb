@@ -194,6 +194,7 @@ module Report::Lifecycle
 
     # A step of the form posts only its own answers: they are merged into the stored ones. A key posted
     # blank removes its answer, a key not posted stays. Called under the row lock, on the stored values.
+    # A casualty's answers are not merged: the form posts each casualty whole, with its id.
     def merge_answers(attrs)
       attrs = attrs.deep_dup
       attrs["answers"] = merged_answers(answers, attrs["answers"], scope: :report) if attrs.key?("answers")

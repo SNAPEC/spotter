@@ -174,7 +174,12 @@ RSpec.describe Report, type: :model do
   end
 
   describe "confidential draft on its last day" do
-    let(:report) { described_class.start_draft!(mode: "confidential", user: user).first }
+    # Filled now: saving on the expiry day would push the expiry back and test nothing.
+    let(:report) do
+      described_class.start_draft!(mode: "confidential", user: user).first.tap do |draft|
+        draft.save_draft!(event_type: "near_miss", narrative_attributes: { raw_text: "Récit fictif." })
+      end
+    end
 
     def run_daily_jobs
       CutOwnershipsJob.perform_now
@@ -186,7 +191,7 @@ RSpec.describe Report, type: :model do
         run_daily_jobs
 
         expect(described_class.owned_by(user)).to contain_exactly(report)
-        expect { submittable(report).submit! }.not_to raise_error
+        expect { report.submit! }.not_to raise_error
       end
     end
 
