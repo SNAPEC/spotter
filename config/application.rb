@@ -32,7 +32,9 @@ module Spotter
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # config.time_zone = "Central Time (US & Canada)"
+    # Day-based deadlines (draft expiry, editing window, ownership cutoff, purges) roll over at midnight in
+    # France. Timestamps stay stored in UTC.
+    config.time_zone = "Europe/Paris"
     # config.eager_load_paths << Rails.root.join("extras")
 
     # Its routes serve and accept files without authentication. Files will go through our own authorised

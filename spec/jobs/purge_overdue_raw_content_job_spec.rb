@@ -22,6 +22,6 @@ RSpec.describe PurgeOverdueRawContentJob, type: :job do
   it "is scheduled daily at 3:00" do
     recurring = Rails.application.config_for(:recurring, env: "production")
 
-    expect(recurring[:purge_overdue_raw_content]).to include(class: "PurgeOverdueRawContentJob", schedule: "every day at 3am")
+    expect(recurring[:purge_overdue_raw_content]).to include(class: "PurgeOverdueRawContentJob", schedule: "every day at 3am Europe/Paris")
   end
 end

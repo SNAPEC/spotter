@@ -42,6 +42,6 @@ RSpec.describe RequeueStalledAnalysesJob, type: :job do
   it "is scheduled daily at 4:00, after the 3:00 jobs" do
     recurring = Rails.application.config_for(:recurring, env: "production")
 
-    expect(recurring[:requeue_stalled_analyses]).to include(class: "RequeueStalledAnalysesJob", schedule: "every day at 4am")
+    expect(recurring[:requeue_stalled_analyses]).to include(class: "RequeueStalledAnalysesJob", schedule: "every day at 4am Europe/Paris")
   end
 end

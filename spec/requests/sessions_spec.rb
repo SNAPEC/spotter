@@ -19,7 +19,8 @@ RSpec.describe "Sessions", type: :request do
     end
 
     expect(user.sessions.sole.expires_on).to eq(Date.new(2026, 12, 31))
-    expect(session_cookie_header).to include("expires=Thu, 31 Dec 2026 23:59:59 GMT")
+    # The end of the day in Paris (UTC+1 in winter).
+    expect(session_cookie_header).to include("expires=Thu, 31 Dec 2026 22:59:59 GMT")
   end
 
   it "drops the cookie once the session has expired" do

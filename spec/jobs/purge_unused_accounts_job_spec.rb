@@ -126,6 +126,6 @@ RSpec.describe PurgeUnusedAccountsJob, type: :job do
   it "is scheduled daily at 3:00" do
     recurring = Rails.application.config_for(:recurring, env: "production")
 
-    expect(recurring[:purge_unused_accounts]).to include(class: "PurgeUnusedAccountsJob", schedule: "every day at 3am")
+    expect(recurring[:purge_unused_accounts]).to include(class: "PurgeUnusedAccountsJob", schedule: "every day at 3am Europe/Paris")
   end
 end
