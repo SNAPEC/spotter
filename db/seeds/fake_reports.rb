@@ -6,6 +6,7 @@
 #
 # Idempotent: accounts are found by e-mail, and reports are generated only while the database holds
 # none. A report cannot carry a marker (no link to a user, no date), so "no report yet" is the marker.
+raise "Fictional seeds must never run in production" if Rails.env.production?
 
 account_specs = {
   declarant: [ "declarant@example.test", "declarant" ],
