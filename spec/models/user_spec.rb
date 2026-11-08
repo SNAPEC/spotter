@@ -100,4 +100,25 @@ RSpec.describe User, type: :model do
       end
     end
   end
+
+  describe ".send_magic_link" do
+    include ActionMailer::TestHelper
+
+    it "creates a declarant for an unknown email and mails the link" do
+      user = nil
+
+      assert_enqueued_emails(1) { user = User.send_magic_link("nouveau@example.com") }
+      expect(user).to be_persisted.and have_attributes(role: "declarant")
+    end
+
+    it "reuses the account of a known email" do
+      user
+
+      expect { User.send_magic_link("LEA.MARTIN@example.com") }.not_to change(User, :count)
+    end
+
+    it "sends nothing for a malformed email" do
+      assert_no_enqueued_emails { expect(User.send_magic_link("nope")).not_to be_persisted }
+    end
+  end
 end

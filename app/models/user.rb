@@ -14,6 +14,13 @@ class User < ApplicationRecord
     login_token_version
   end
 
+  # Unknown emails get a declarant account so the answer never reveals who is registered.
+  def self.send_magic_link(email)
+    find_or_create_by(email: email).tap do |user|
+      MagicLinkMailer.with(user: user).sign_in.deliver_later if user.persisted?
+    end
+  end
+
   def self.sign_in_with_magic_link(token)
     user = find_by_token_for(:magic_link, token)
     user if user&.consume_magic_link!
