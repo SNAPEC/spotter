@@ -4,6 +4,7 @@ Le socle livre les modèles du domaine, l'authentification et des écrans vides 
 
 Ordre de lecture conseillé :
 
+0. [Démarrer](demarrer.md) : installer, lancer, et la façon de travailler (branche, PR, relecture).
 1. [Domaine](domaine.md) : les modèles, le cycle de vie d'un RETEX, ce qui est supprimé et quand.
 2. [Contrôleurs](controleurs.md) : la forme d'un contrôleur, l'autorisation, les erreurs et leurs codes HTTP.
 3. [Écrans](ecrans.md) : une fiche par écran à construire, avec la méthode du modèle à appeler.
@@ -12,5 +13,3 @@ Ordre de lecture conseillé :
 6. [Tests](tests.md) : comment tester un écran.
 
 Les règles générales (pas de donnée réelle, pas d'IP, un rapport ne pointe jamais vers son auteur…) sont dans [`CLAUDE.md`](../CLAUDE.md) et s'appliquent partout. Le contenu métier des écrans (questions du formulaire, découpage en étapes, textes) vient des documents de conception, privés : ils ne sont pas recopiés ici.
-
-En développement : `bin/setup` crée une base avec quatre comptes et quatorze RETEX fictifs à toutes les étapes ; `/dev/login` connecte en un clic, `/dev/styleguide` montre les composants.
