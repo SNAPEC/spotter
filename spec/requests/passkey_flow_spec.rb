@@ -230,7 +230,7 @@ RSpec.describe "Passkey flow", type: :request do
 
       post recovery_code_path, params: { code: code }
       expect(response).to redirect_to(new_passkey_registration_path)
-      get "/analyst"
+      get new_passkey_registration_path
       expect(response).to have_http_status(:ok)
 
       delete session_path
@@ -242,6 +242,40 @@ RSpec.describe "Passkey flow", type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       get "/analyst"
       expect(response).to redirect_to(new_passkey_session_path)
+    end
+
+    it "confines a session opened with a recovery code to enrolment and sign out, until a new passkey" do
+      code = analyst.generate_recovery_codes!.first
+      sign_in(analyst)
+      post recovery_code_path, params: { code: code }
+
+      [ "/analyst", "/", new_passkey_session_path, new_recovery_code_path ].each do |path|
+        get path
+        expect(response).to redirect_to(new_passkey_registration_path)
+      end
+      delete sessions_path
+      expect(response).to redirect_to(new_passkey_registration_path)
+      expect(analyst.sessions.count).to eq(1)
+
+      get "/analyst"
+      register_passkey(nickname: "Nouvel appareil", authenticator: WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin))
+
+      expect(response).to redirect_to("http://www.example.com/analyst")
+      expect(analyst.passkeys.count).to eq(2)
+      expect(analyst.sessions.sole).to have_attributes(passkey_verified: true, recovered: false)
+      get "/analyst"
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "lets a recovered session sign out" do
+      code = analyst.generate_recovery_codes!.first
+      sign_in(analyst)
+      post recovery_code_path, params: { code: code }
+
+      delete session_path
+
+      expect(response).to redirect_to(login_path)
+      expect(analyst.sessions).to be_empty
     end
 
     it "lets a pending staff member sign out of this session, not everywhere" do

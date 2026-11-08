@@ -82,6 +82,8 @@ RSpec.describe "No IP address anywhere", type: :request do
 
     sign_in_over_http(analyst.email)
     post recovery_code_path, params: { code: analyst.generate_recovery_codes!.first }, env: env
+    # A recovered session only enrols a passkey; this journey skips the WebAuthn ceremony.
+    analyst.sessions.sole.update!(recovered: false)
     get analyst_root_path, env: env
     expect(response).to have_http_status(:ok)
 

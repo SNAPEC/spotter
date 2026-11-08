@@ -58,7 +58,7 @@ class Session < ApplicationRecord
       end
 
       Passkey.register!(user: user, credential: credential, challenge: challenge, nickname: nickname)
-      update!(passkey_verified: true)
+      update!(passkey_verified: true, recovered: false)
       user.recovery_codes.exists? ? [] : user.generate_recovery_codes!
     end
   end
@@ -70,8 +70,9 @@ class Session < ApplicationRecord
     Passkey.authenticate(user: user, credential: credential, challenge: challenge).present? && update!(passkey_verified: true)
   end
 
+  # A recovery code stands in for a lost passkey: the session it opens only enrols a new one.
   def verify_recovery_code(code)
-    user.use_recovery_code!(code) && update!(passkey_verified: true)
+    user.use_recovery_code!(code) && update!(passkey_verified: true, recovered: true)
   end
 
   private

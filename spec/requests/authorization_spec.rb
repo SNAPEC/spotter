@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe "Authorization", type: :request do
   def sign_in(user)
     post magic_link_path(user.magic_link_token)
-    post recovery_code_path, params: { code: user.generate_recovery_codes!.first } if user.staff?
+    Session.find_by!(user: user).update!(passkey_verified: true) if user.staff?
   end
 
   def user_with(role)

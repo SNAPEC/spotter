@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_190001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_200001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -138,6 +138,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_190001) do
     t.boolean "passkey_verified", default: false, null: false
     t.date "expires_on", null: false
     t.string "webauthn_challenge"
+    t.boolean "recovered", default: false, null: false
     t.index ["expires_on"], name: "index_sessions_on_expires_on"
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end

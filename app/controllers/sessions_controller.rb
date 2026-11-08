@@ -1,5 +1,6 @@
 class SessionsController < ApplicationController
   allow_pending_passkey only: :destroy
+  allow_recovered_session only: :destroy
 
   def destroy
     terminate_session
