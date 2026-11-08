@@ -12,10 +12,14 @@ class CspReportsController < ApplicationController
 
   MAX_BODY_BYTES = 16.kilobytes
 
+  # The declared length is checked first, then the bytes actually read: a chunked body declares none.
   def create
     return head :content_too_large if request.content_length.to_i > MAX_BODY_BYTES
 
-    Rails.logger.warn("CSP violation: #{CspViolation.summary(request.raw_post)}")
+    body = request.body.read(MAX_BODY_BYTES + 1).to_s
+    return head :content_too_large if body.bytesize > MAX_BODY_BYTES
+
+    Rails.logger.warn("CSP violation: #{CspViolation.summary(body)}")
     head :no_content
   end
 end

@@ -75,6 +75,14 @@ RSpec.describe "CSP violation reports", type: :request do
     expect(io.string).not_to include("CSP violation")
   end
 
+  it "refuses a body over the limit that declares no length, reading no more than the limit" do
+    body = report("inline") + (" " * 17.kilobytes)
+    post "/csp_reports", env: { "REMOTE_ADDR" => ip, "CONTENT_TYPE" => "application/csp-report", "rack.input" => StringIO.new(body), "CONTENT_LENGTH" => nil }
+
+    expect(response).to have_http_status(:content_too_large)
+    expect(io.string).not_to include("CSP violation")
+  end
+
   it "is rate limited per client" do
     20.times { send_report(report("inline")) }
     expect(response).to have_http_status(:no_content)
