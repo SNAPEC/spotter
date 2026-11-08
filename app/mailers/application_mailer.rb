@@ -10,4 +10,9 @@ class ApplicationMailer < ActionMailer::Base
   rescue_from StandardError do |error|
     raise DeliveryFailed, error.class.name, cause: nil
   end
+
+  # Ours, not the provider's: a vanished record is discarded by the job, a broken template must show.
+  rescue_from ActiveRecord::RecordNotFound, ActionView::Template::Error do |error|
+    raise error
+  end
 end
