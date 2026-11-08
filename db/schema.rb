@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_130002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -30,8 +30,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_120001) do
     t.string "model", null: false
     t.string "prompt_version", null: false
     t.string "status", default: "proposed", null: false
-    t.jsonb "proposals", default: {}, null: false
-    t.jsonb "modifications", default: {}, null: false
+    t.text "proposals", null: false
+    t.text "modifications", null: false
     t.jsonb "decisions", default: {}, null: false
     t.index ["report_id", "prompt_version"], name: "index_analyses_on_report_id_and_prompt_version", unique: true
     t.index ["report_id"], name: "index_analyses_on_report_id"
@@ -75,6 +75,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_120001) do
     t.text "debrief_message"
     t.text "anonymized_text"
     t.jsonb "anonymized_debrief"
+    t.text "free_text_answers"
     t.index ["report_id"], name: "index_narratives_on_report_id", unique: true
   end
 

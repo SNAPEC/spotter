@@ -7,14 +7,29 @@ class Narrative < ApplicationRecord
 
   belongs_to :report
 
-  encrypts :raw_text, *DEBRIEF_FIELDS
+  # Answers to the taxonomy's free-text fields, code => string: they live here, encrypted like the
+  # narrative they quote, never in Report#answers.
+  serialize :free_text_answers, coder: JSON
+  attribute :free_text_answers, default: -> { {} }
+  encrypts :raw_text, :free_text_answers, *DEBRIEF_FIELDS
+
+  validate :free_text_answers_fit_taxonomy, if: -> { report&.taxonomy_version }
 
   def purge_raw!
-    update!(raw_text: nil, **DEBRIEF_FIELDS.index_with(nil))
+    update!(raw_text: nil, free_text_answers: {}, **DEBRIEF_FIELDS.index_with(nil))
   end
 
   private
     def kept_after_decision?
-      [ "raw_text", *DEBRIEF_FIELDS ].all? { |field| self[field].nil? }
+      free_text_answers.blank? && [ "raw_text", *DEBRIEF_FIELDS ].all? { |field| self[field].nil? }
+    end
+
+    def free_text_answers_fit_taxonomy
+      answers = free_text_answers
+      return errors.add(:free_text_answers, :invalid) unless answers.is_a?(Hash)
+
+      known = report.taxonomy_version.free_text_codes(scope: :report)
+      invalid = answers.keys.map(&:to_s) - known
+      errors.add(:free_text_answers, :invalid, codes: invalid) if invalid.any? || !answers.values.all?(String)
     end
 end

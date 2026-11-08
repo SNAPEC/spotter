@@ -45,7 +45,8 @@ RSpec.describe Report, type: :model do
     end
 
     it "encrypts the raw narrative, the debriefing answers, the clarifications and the user reference" do
-      expect(Narrative.encrypted_attributes).to include(:raw_text, *Narrative::DEBRIEF_FIELDS.map(&:to_sym))
+      expect(Narrative.encrypted_attributes).to include(:raw_text, :free_text_answers, *Narrative::DEBRIEF_FIELDS.map(&:to_sym))
+      expect(Analysis.encrypted_attributes).to include(:proposals, :modifications)
       expect(Clarification.encrypted_attributes).to include(:body)
       expect(ReportOwnership.encrypted_attributes).to include(:user_ref)
     end
@@ -237,6 +238,14 @@ RSpec.describe Report, type: :model do
 
       expect(report.reload.narrative.raw_text).to eq("Chute fictive au troisième point.")
       expect(report.casualties.sole.severity).to eq("minor")
+    end
+
+    it "saves free-text answers in the narrative" do
+      report.save_draft!(narrative_attributes: { free_text_answers: { "material_damage" => "Corde fictive coupée" } })
+
+      expect(report.reload.narrative.free_text_answers).to eq("material_damage" => "Corde fictive coupée")
+      expect(report.answers).to be_empty
+      expect { report.save_draft!(answers: { "material_damage" => "Corde fictive" }) }.to raise_error(ActiveRecord::RecordInvalid)
     end
 
     it "refuses attributes outside the draft content" do

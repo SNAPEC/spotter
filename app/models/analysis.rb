@@ -7,6 +7,12 @@ class Analysis < ApplicationRecord
 
   belongs_to :report
 
+  %i[proposals modifications].each do |column|
+    serialize column, coder: JSON
+    attribute column, default: -> { {} }
+    encrypts column
+  end
+
   validates :status, inclusion: { in: STATUSES }
   validates :provider, inclusion: { in: PROVIDERS }
   validates :model, :prompt_version, presence: true

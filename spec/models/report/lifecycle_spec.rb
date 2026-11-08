@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe Report::Lifecycle, type: :model do
   include ActiveSupport::Testing::TimeHelpers
 
-  # v0 has no free-text casualty field: one is added so the purge of casualty answers is exercised.
+  # v0 has no free-text casualty field: one is added so its refusal in casualty answers is exercised.
   before do
     version = TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml"))
     version.fields.create!(code: "injury_detail", group: "casualty", kind: "text", scope: "casualty", position: 99, label: "Précision")
@@ -17,9 +17,10 @@ RSpec.describe Report::Lifecycle, type: :model do
     report, = Report.start_draft!(mode: mode, user: (user if mode == "confidential"))
     report.save_draft!(
       event_type: "near_miss",
-      answers: { "material_damage" => "Corde fictive coupée", "weather" => "good", "clients_count" => 4 },
-      narrative_attributes: Narrative::DEBRIEF_FIELDS.index_with { "Réponse fictive." }.merge(raw_text: "Récit fictif."),
-      casualties_attributes: [ { severity: "minor", answers: { "injury_detail" => "Détail fictif", "age_range" => "over_60" } } ]
+      answers: { "weather" => "good", "clients_count" => 4 },
+      narrative_attributes: Narrative::DEBRIEF_FIELDS.index_with { "Réponse fictive." }
+        .merge(raw_text: "Récit fictif.", free_text_answers: { "material_damage" => "Corde fictive coupée" }),
+      casualties_attributes: [ { severity: "minor", answers: { "age_range" => "over_60" } } ]
     )
     report
   end
@@ -145,27 +146,13 @@ RSpec.describe Report::Lifecycle, type: :model do
 
         expect { narrative.update!(raw_text: "Nouveau récit fictif") }.to raise_error(ActiveRecord::RecordInvalid)
         expect { narrative.update!(debrief_message: "Message fictif") }.to raise_error(ActiveRecord::RecordInvalid)
+        expect { narrative.update!(free_text_answers: { "material_damage" => "Texte fictif réinjecté" }) }.to raise_error(ActiveRecord::RecordInvalid)
         expect { report.update!(narrative_attributes: { raw_text: "Récit fictif réinjecté" }) }.to raise_error(ActiveRecord::RecordInvalid)
         expect { report.casualties.create!(severity: "minor") }.to raise_error(ActiveRecord::RecordInvalid)
         expect { casualty.update!(severity: "fatal") }.to raise_error(ActiveRecord::RecordInvalid)
         expect { casualty.destroy! }.to raise_error(ActiveRecord::RecordNotDestroyed)
         expect(Narrative.where(report_id: report.id).pick(:raw_text, :debrief_message)).to eq([ nil, nil ])
         expect(Casualty.where(report_id: report.id).pluck(:severity)).to eq([ "minor" ])
-      end
-    end
-
-    %i[validate! reject!].each do |decision|
-      it "refuses free-text answers written back after #{decision}" do
-        report = in_validation
-        report.public_send(decision, analyst)
-
-        stale = Report.find(report.id)
-        expect { stale.update!(answers: stale.answers.merge("material_damage" => "Texte fictif réinjecté")) }
-          .to raise_error(ActiveRecord::RecordInvalid)
-        expect { report.casualties.sole.update!(answers: { "injury_detail" => "Détail fictif réinjecté" }) }
-          .to raise_error(ActiveRecord::RecordInvalid)
-        expect(Report.find(report.id).answers).not_to have_key("material_damage")
-        expect(Casualty.where(report_id: report.id).sole.answers).not_to have_key("injury_detail")
       end
     end
 
@@ -217,6 +204,8 @@ RSpec.describe Report::Lifecycle, type: :model do
           narrative = Narrative.find(narrative_id)
           expect(narrative.raw_text).to be_nil
           Narrative::DEBRIEF_FIELDS.each { |field| expect(narrative[field]).to be_nil }
+          expect(narrative.free_text_answers).to eq({})
+          expect(Narrative.connection.select_value("SELECT free_text_answers FROM narratives WHERE id = '#{narrative_id}'")).not_to include("Corde")
           expect(Narrative.where(id: narrative_id).pick(:raw_text, *Narrative::DEBRIEF_FIELDS)).to all(be_nil)
           expect(ReportOwnership.where(report_id: report.id)).to be_empty
           expect(Report.owned_by(user)).to be_empty
@@ -226,10 +215,47 @@ RSpec.describe Report::Lifecycle, type: :model do
           expect(report.casualties.sole.severity).to eq("minor")
           expect(Clarification.where(report_id: report.id)).to be_empty
           expect(Analysis.where(report_id: report.id).pluck(:modifications)).to eq([ {} ])
-          expect(Analysis.where(report_id: report.id).pick(Arel.sql("proposals::text"))).not_to include("excerpt", "Récit fictif")
+          expect(Analysis.where(report_id: report.id).sole.proposals.to_s).not_to include("excerpt", "Récit fictif")
           expect(Analysis.where(report_id: report.id).sole.proposals).to include("weather" => { "value" => be_present })
         end
       end
+    end
+  end
+
+  describe "encryption at rest" do
+    def raw(table, column, id)
+      Narrative.connection.select_value("SELECT #{column} FROM #{table} WHERE id = '#{id}'")
+    end
+
+    it "stores free-text answers, excerpts and modifications as ciphertext" do
+      report = in_validation
+      analysis = report.analyses.sole
+      analysis.update!(modifications: { "anonymized_text" => "Récit retouché fictif." })
+
+      expect(report.narrative.reload.free_text_answers).to eq("material_damage" => "Corde fictive coupée")
+      expect(raw("narratives", "free_text_answers", report.narrative.id)).not_to include("Corde", "material_damage")
+      expect(raw("analyses", "proposals", analysis.id)).not_to include("excerpt", "Récit fictif", "weather")
+      expect(raw("analyses", "modifications", analysis.id)).not_to include("anonymized_text", "retouché")
+      expect(analysis.reload.proposals["weather"]).to include("excerpt")
+      expect(analysis.modifications).to eq("anonymized_text" => "Récit retouché fictif.")
+    end
+  end
+
+  describe "free-text codes" do
+    let(:report) { draft }
+
+    it "are refused in the answers of a report and of a casualty, decided or not" do
+      expect { report.update!(answers: { "material_damage" => "Texte fictif" }) }.to raise_error(ActiveRecord::RecordInvalid)
+      expect { report.casualties.sole.update!(answers: { "injury_detail" => "Détail fictif" }) }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it "are accepted in the narrative only for known text fields of the report scope, as strings" do
+      narrative = report.narrative
+
+      [ { "weather" => "good" }, { "injury_detail" => "Détail fictif" }, { "unknown" => "x" }, { "material_damage" => 3 } ].each do |answers|
+        expect { narrative.update!(free_text_answers: answers) }.to raise_error(ActiveRecord::RecordInvalid)
+      end
+      expect(narrative.reload.free_text_answers).to eq("material_damage" => "Corde fictive coupée")
     end
   end
 end

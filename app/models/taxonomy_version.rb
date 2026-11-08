@@ -73,6 +73,12 @@ class TaxonomyVersion < ApplicationRecord
     field_by_code(field_code)&.options.to_a
   end
 
+  def free_text_codes(scope: nil)
+    text_fields = fields.where(kind: "text")
+    text_fields = text_fields.where(scope: scope.to_s) if scope
+    text_fields.pluck(:code)
+  end
+
   # Codes are "<field>.<error>": unknown_field, invalid_option, duplicate_option, not_a_list, not_a_string,
   # not_an_integer, out_of_range; "answers.not_a_hash" when answers is not a Hash.
   def validate_answers(answers, scope:)
