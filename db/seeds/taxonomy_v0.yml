@@ -52,7 +52,7 @@ fields:
     options:
       - { code: individuals, label: Groupe d'individuels }
       - { code: school_or_youth, label: Scolaire ou accueil collectif de mineurs }
-      - { code: club_or_other, label: Club, collectivité ou autre }
+      - { code: club_or_other, label: "Club, collectivité ou autre" }
   - code: clients_count
     group: context
     kind: integer

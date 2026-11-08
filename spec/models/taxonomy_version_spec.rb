@@ -13,6 +13,31 @@ RSpec.describe TaxonomyVersion do
       expect(version.fields.pluck(:position)).to eq((0...40).to_a)
     end
 
+    it "keeps the full label of club_or_other" do
+      option = version.fields.flat_map(&:options).find { |o| o.code == "club_or_other" }
+      expect(option.label).to eq("Club, collectivité ou autre")
+    end
+
+    it "raises on unexpected keys and on missing label or code" do
+      bad = lambda do |yaml|
+        file = Tempfile.new([ "taxonomy", ".yml" ])
+        file.write(yaml)
+        file.close
+        file.path
+      end
+      stray = "number: 9\nfields:\n  - code: a\n    group: g\n    kind: single\n    scope: report\n    label: A\n    options:\n      - { code: x, label: X, \"oops\": }\n"
+      no_label = "number: 9\nfields:\n  - code: a\n    group: g\n    kind: text\n    scope: report\n"
+      expect { described_class.import!(bad.call(stray)) }.to raise_error(TaxonomyVersion::InvalidImport, /oops/)
+      expect { described_class.import!(bad.call(no_label)) }.to raise_error(TaxonomyVersion::InvalidImport, /label/)
+      expect(described_class.exists?(number: 9)).to be(false)
+    end
+
+    it "raises a translated RecordInvalid on a blank field code" do
+      version
+      expect { version.fields.create!(code: "", group: "g", kind: "text", scope: "report", position: 99, label: "X") }
+        .to raise_error(ActiveRecord::RecordInvalid, /doit être renseigné/)
+    end
+
     it "refuses to import the same number twice" do
       version
       expect { described_class.import!(path) }.to raise_error(TaxonomyVersion::AlreadyImported)
