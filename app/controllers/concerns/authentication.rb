@@ -26,7 +26,7 @@ module Authentication
     end
 
     def find_session_by_cookie
-      Session.find_by(id: cookies.signed[:session_id]) if cookies.signed[:session_id]
+      Session.resume(cookies.signed[:session_id]) if cookies.signed[:session_id]
     end
 
     def request_authentication
@@ -46,12 +46,17 @@ module Authentication
 
       user.sessions.create!.tap do |session|
         Current.session = session
-        cookies.signed.permanent[:session_id] = { value: session.id, httponly: true, same_site: :lax }
+        cookies.signed[:session_id] = { value: session.id, expires: session.expires_on.end_of_day, httponly: true, same_site: :lax }
       end
     end
 
     def terminate_session
       Current.session.destroy
+      cookies.delete(:session_id)
+    end
+
+    def terminate_all_sessions
+      Current.user.sign_out_everywhere!
       cookies.delete(:session_id)
     end
 end

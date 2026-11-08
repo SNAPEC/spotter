@@ -101,6 +101,18 @@ RSpec.describe User, type: :model do
     end
   end
 
+  describe "#sign_out_everywhere!" do
+    it "destroys every session and invalidates pending magic links" do
+      2.times { user.sessions.create! }
+      token = user.magic_link_token
+
+      user.sign_out_everywhere!
+
+      expect(user.sessions.reload).to be_empty
+      expect(User.find_by_token_for(:magic_link, token)).to be_nil
+    end
+  end
+
   describe ".send_magic_link" do
     include ActionMailer::TestHelper
 

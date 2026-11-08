@@ -38,6 +38,13 @@ class User < ApplicationRecord
     consumed
   end
 
+  def sign_out_everywhere!
+    transaction do
+      sessions.destroy_all
+      increment!(:login_token_version)
+    end
+  end
+
   def staff?
     analyst? || admin?
   end

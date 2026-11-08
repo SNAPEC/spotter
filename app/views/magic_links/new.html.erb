@@ -3,6 +3,10 @@
 <div class="mx-auto w-full max-w-md">
   <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
 
+  <% if flash[:notice] %>
+    <p class="mt-4 py-2 px-3 bg-green-50 text-green-800 rounded" role="status"><%= flash[:notice] %></p>
+  <% end %>
+
   <% if flash[:alert] %>
     <p class="mt-4 py-2 px-3 bg-red-50 text-red-700 rounded" role="alert"><%= flash[:alert] %></p>
   <% end %>

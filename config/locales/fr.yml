@@ -5,6 +5,13 @@ fr:
       intro: "Pour vous connecter à Spotter, ouvrez ce lien :"
       action: "Me connecter"
       expiry: "Ce lien est valable 15 minutes et ne sert qu’une fois. Si vous n’avez rien demandé, ignorez ce message."
+  sessions:
+    signed_out: "Vous êtes déconnecté."
+    destroy:
+      submit: "Se déconnecter"
+    destroy_all:
+      submit: "Se déconnecter partout"
+      done: "Vous êtes déconnecté de tous vos appareils."
   magic_links:
     new:
       title: "Connexion"

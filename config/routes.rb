@@ -5,6 +5,9 @@ Rails.application.routes.draw do
   get "login/:token" => "magic_links#show", as: :magic_link
   post "login/:token" => "magic_links#consume"
 
+  resource :session, only: :destroy
+  delete "sessions" => "sessions#destroy_all", as: :sessions
+
   # Placeholder until the declarant home lands (task 4).
   root "magic_links#new"
 
