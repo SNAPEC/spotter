@@ -10,3 +10,6 @@
 
 taxonomy_path = Rails.root.join("db/seeds/taxonomy_v0.yml")
 TaxonomyVersion.import!(taxonomy_path).publish! unless TaxonomyVersion.exists?(number: 0)
+
+# Fictional accounts and reports: never in production.
+load Rails.root.join("db/seeds/fake_reports.rb") unless Rails.env.production?
