@@ -9,7 +9,7 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR)
 secrets=$(grep -E '(^|/)\.env(\..+)?$|^config/master\.key$|^config/credentials/.*\.key$|^config/.*\.key$' <<<"$staged" | grep -v '\.env\.example$' || true)
 if [ -n "$secrets" ]; then
   echo "pre-commit: refusing to commit secret files:" >&2
-  sed 's/^/  /' <<<"$secrets" >&2
+  while IFS= read -r f; do echo "  $f" >&2; done <<<"$secrets"
   exit 1
 fi
 

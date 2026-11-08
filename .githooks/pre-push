@@ -61,7 +61,7 @@ echo "pre-push: $(wc -l <<<"$changed" | tr -d ' ') file(s) changed"
 dirty=$(git status --porcelain --untracked-files=all | grep -E '^( M|M |MM|A |\?\? )' | grep -Ev '^\?\? (tmp|log|storage|coverage)/' || true)
 if [ -n "$dirty" ]; then
   echo "  FAIL  clean-tree     uncommitted or untracked files:"
-  sed 's/^/        /' <<<"$dirty"
+  while IFS= read -r f; do echo "        $f"; done <<<"$dirty"
   failed=1
 fi
 
