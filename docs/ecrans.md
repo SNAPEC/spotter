@@ -20,7 +20,7 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 - `POST` vers une action qui appelle `Report.start_draft!(mode:, user:)`.
 - Confidentiel : connecté, `user: Current.user`. Redirection vers la première étape.
 - Anonyme : sans compte, `user: nil`, même si quelqu'un est connecté. La méthode renvoie `[report, token]` : le jeton va dans le cookie chiffré `draft_token` (voir [Contrôleurs](controleurs.md#secrets-montrés-une-fois)). Le contrôleur est ouvert sans connexion et s'ajoute aux exemptions de `default_deny_spec.rb`.
-- Le point d'entrée du mode anonyme (lien depuis la page de connexion ?) reste à placer.
+- Point d'entrée : un écran « Déclarer un RETEX », ouvert sans connexion, propose les deux modes. Confidentiel : connexion si besoin, puis brouillon. Anonyme : brouillon tout de suite, sans compte. La page de connexion y renvoie. Une personne connectée voit aussi les deux choix.
 
 ### Formulaire en étapes
 
