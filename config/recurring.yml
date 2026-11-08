@@ -22,6 +22,9 @@ production:
   purge_expired_drafts:
     class: PurgeExpiredDraftsJob
     schedule: every day at 3am
+  purge_unused_accounts:
+    class: PurgeUnusedAccountsJob
+    schedule: every day at 3am
   # Weekly, so a digest's time in the mail provider's log points to a week of questions, not to one.
   clarification_digest:
     class: ClarificationDigestJob

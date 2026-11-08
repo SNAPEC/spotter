@@ -2,6 +2,10 @@ class User < ApplicationRecord
   ROLES = %w[declarant analyst admin].freeze
   MINIMUM_ADMINS = 2
   ENROLLMENT_CODE_VALIDITY = 7.days
+  # Declarant accounts nobody uses are purged: never signed in, 30 days after creation; otherwise
+  # 12 months after the last session expired. Both rounded up to the end of a month.
+  UNUSED_ACCOUNT_DELAY = 30.days
+  DORMANT_ACCOUNT_DELAY = 12.months
 
   class PasskeyResetNotAllowed < StandardError; end
   class EnrollmentNotAllowed < StandardError; end
@@ -18,6 +22,9 @@ class User < ApplicationRecord
 
   scope :staff, -> { where(role: %w[analyst admin]) }
   scope :active, -> { where(deactivated_at: nil) }
+  scope :purge_due, -> { declarant.where(purge_on: ...Date.current) }
+
+  attribute :purge_on, :date, default: -> { (Date.current + UNUSED_ACCOUNT_DELAY).end_of_month }
 
   encrypts :email, deterministic: true, downcase: true
   normalizes :email, with: ->(email) { email.strip }
@@ -34,6 +41,20 @@ class User < ApplicationRecord
   def self.send_magic_link(email)
     create_or_find_by(email: email).tap do |user|
       MagicLinkMailer.with(user: user).sign_in.deliver_later if user.persisted?
+    end
+  end
+
+  # A rate-limit key per address that never stores the address, normalised as the email column is.
+  def self.email_fingerprint(email)
+    OpenSSL::HMAC.hexdigest("SHA256", Rails.application.key_generator.generate_key("email_fingerprint", 32),
+      email.to_s.strip.downcase)
+  end
+
+  def self.purge_unused
+    purge_due.find_each do |user|
+      user.purge_if_unused!
+    rescue ActiveRecord::RecordNotFound
+      next
     end
   end
 
@@ -78,6 +99,20 @@ class User < ApplicationRecord
     recovery_codes.where(digest: RecoveryCode.digest(code)).delete_all == 1
   end
 
+  # Pushed forward only: an older session created later never brings the date back.
+  def postpone_purge!(session_expires_on:)
+    purge_on = (session_expires_on + DORMANT_ACCOUNT_DELAY).end_of_month
+    User.where(id: id, purge_on: ...purge_on).update_all(purge_on: purge_on)
+  end
+
+  # Hard delete, through the same path as any account deletion. Everything is checked again under the
+  # row lock, which a sign-in creating a session also needs.
+  def purge_if_unused!
+    with_lock do
+      destroy! if declarant? && purge_on < Date.current && sessions.none? && ReportOwnership.of(self).live.none?
+    end
+  end
+
   # Signing out everywhere too: whoever held the lost passkey may hold a verified session.
   # Returns the new enrollment code in clear, for the admin to hand over.
   def reset_passkeys!(by:)
@@ -85,6 +120,8 @@ class User < ApplicationRecord
 
     transaction do
       raise PasskeyResetNotAllowed unless acting_admin?(by)
+      lock_for_passkey_change!
+      raise PasskeyResetNotAllowed unless staff? && active?
 
       passkeys.delete_all
       recovery_codes.delete_all
@@ -134,6 +171,7 @@ class User < ApplicationRecord
 
     transaction do
       raise DeactivationNotAllowed unless acting_admin?(by)
+      lock_for_passkey_change!
       raise TooFewAdmins if admin? && active? && other_admins_count < MINIMUM_ADMINS
 
       deactivated = User.active.where(id: id)
@@ -161,6 +199,10 @@ class User < ApplicationRecord
     analyst? || admin?
   end
 
+  def active_staff?
+    staff? && active?
+  end
+
   def member?
     membership_expires_on.present? && membership_expires_on >= Date.current
   end
@@ -171,6 +213,12 @@ class User < ApplicationRecord
     def acting_admin?(by)
       User.where(role: "admin").order(:id).lock.pluck(:id)
       by.reload.then { |actor| actor.admin? && actor.active? }
+    end
+
+    # Serialises with Session#register_passkey!, which locks the same row. Taken after the admin rows
+    # (acting_admin?), never before, so two admins acting on each other cannot deadlock.
+    def lock_for_passkey_change!
+      lock!
     end
 
     def keeps_enough_admins

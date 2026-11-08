@@ -3,6 +3,7 @@ module Authorization
 
   included do
     before_action :require_passkey_verified
+    before_action :require_passkey_after_recovery
   end
 
   class_methods do
@@ -12,6 +13,10 @@ module Authorization
 
     def allow_pending_passkey(**options)
       skip_before_action :require_passkey_verified, **options
+    end
+
+    def allow_recovered_session(**options)
+      skip_before_action :require_passkey_after_recovery, **options
     end
   end
 
@@ -27,5 +32,14 @@ module Authorization
 
       session[:return_to_after_authenticating] = request.url if request.get? || request.head?
       redirect_to Current.user.passkeys.any? ? new_passkey_session_path : new_passkey_registration_path
+    end
+
+    # A recovery code proves less than a passkey: until a new passkey is registered, the session
+    # reaches only the enrolment and sign out.
+    def require_passkey_after_recovery
+      return unless Current.session&.recovered?
+
+      session[:return_to_after_authenticating] = request.url if request.get? || request.head?
+      redirect_to new_passkey_registration_path
     end
 end

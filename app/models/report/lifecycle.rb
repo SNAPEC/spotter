@@ -155,7 +155,7 @@ module Report::Lifecycle
 
     # The access trail is written here, in the decision's transaction, so no screen can forget it.
     def decide!(analyst, from:, to:, action:)
-      raise Report::NotAllowed, "only staff decide on a report" unless analyst&.staff?
+      raise Report::NotAllowed, "only active staff decide on a report" unless analyst&.active_staff?
 
       transition!(from: from, to: to) do
         AccessLog.record!(user: analyst, report: self, action: action)

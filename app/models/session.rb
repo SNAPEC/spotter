@@ -2,6 +2,7 @@ class Session < ApplicationRecord
   belongs_to :user
 
   validate :user_is_active, on: :create
+  after_create { user.postpone_purge!(session_expires_on: expires_on) }
 
   attribute :expires_on, :date, default: -> { Date.current.next_month.end_of_month }
 
@@ -38,18 +39,27 @@ class Session < ApplicationRecord
 
   # The first passkey needs the enrollment code an admin handed over: the magic link alone is not enough.
   # Returns the recovery codes when the user had none left, else an empty array.
+  #
+  # The user row lock serialises enrolment with User#reset_passkeys! and User#deactivate!, which take
+  # the same lock: a reset either waits and then deletes the new passkey, or wins and leaves this
+  # session gone. Every check is therefore repeated under the lock.
   def register_passkey!(credential:, nickname: nil, enrollment_code: nil)
     raise Passkey::InvalidCredential, "deactivated account" if user.deactivated?
     raise Passkey::InvalidCredential, "session not verified" unless may_register_passkey?
     challenge = consume_webauthn_challenge!
 
     transaction do
+      user.lock!
+      raise Passkey::InvalidCredential, "session revoked" unless Session.exists?(id)
+      raise Passkey::InvalidCredential, "deactivated account" if user.deactivated?
+      raise Passkey::InvalidCredential, "session not verified" unless may_register_passkey?
+
       if needs_enrollment_code? && !user.consume_enrollment_code!(enrollment_code)
         raise Passkey::InvalidCredential, "invalid enrollment code"
       end
 
       Passkey.register!(user: user, credential: credential, challenge: challenge, nickname: nickname)
-      update!(passkey_verified: true)
+      update!(passkey_verified: true, recovered: false)
       user.recovery_codes.exists? ? [] : user.generate_recovery_codes!
     end
   end
@@ -61,8 +71,9 @@ class Session < ApplicationRecord
     Passkey.authenticate(user: user, credential: credential, challenge: challenge).present? && update!(passkey_verified: true)
   end
 
+  # A recovery code stands in for a lost passkey: the session it opens only enrols a new one.
   def verify_recovery_code(code)
-    user.use_recovery_code!(code) && update!(passkey_verified: true)
+    user.use_recovery_code!(code) && update!(passkey_verified: true, recovered: true)
   end
 
   private

@@ -1,5 +1,6 @@
 class PasskeyRegistrationsController < ApplicationController
   allow_pending_passkey
+  allow_recovered_session
   require_role :analyst, :admin
   before_action :require_registration_allowed
   rate_limit to: 5, within: 3.minutes, only: :create,

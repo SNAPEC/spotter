@@ -4,6 +4,12 @@ class MagicLinksController < ApplicationController
     by: -> { IpFingerprint.for(request) },
     with: -> { flash.now[:alert] = t(".too_many_requests"); render :new, status: :too_many_requests },
     store: Rails.configuration.x.rate_limit_store || cache_store
+  # Per address, against mail-bombing one inbox from many clients. The answer stays the generic one,
+  # so the limit says nothing about the address.
+  rate_limit to: 3, within: 1.hour, only: :create, name: "email",
+    by: -> { User.email_fingerprint(params[:email]) },
+    with: -> { render :create },
+    store: Rails.configuration.x.rate_limit_store || cache_store
 
   def new
   end

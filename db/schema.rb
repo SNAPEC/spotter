@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_190001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_200002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -138,6 +138,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_190001) do
     t.boolean "passkey_verified", default: false, null: false
     t.date "expires_on", null: false
     t.string "webauthn_challenge"
+    t.boolean "recovered", default: false, null: false
     t.index ["expires_on"], name: "index_sessions_on_expires_on"
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
@@ -180,8 +181,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_190001) do
     t.string "enrollment_code_digest"
     t.date "enrollment_code_expires_on"
     t.datetime "deactivated_at"
+    t.date "purge_on", null: false
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["enrollment_code_digest"], name: "index_users_on_enrollment_code_digest", unique: true
+    t.index ["purge_on"], name: "index_users_on_purge_on"
+    t.check_constraint "EXTRACT(day FROM purge_on + 1) = 1::numeric", name: "users_purge_on_end_of_month_check"
     t.check_constraint "role::text = ANY (ARRAY['declarant'::character varying::text, 'analyst'::character varying::text, 'admin'::character varying::text])", name: "users_role_check"
   end
 

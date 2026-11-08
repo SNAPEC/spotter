@@ -16,6 +16,11 @@ RSpec.describe "Magic link sign-in", type: :request do
     perform_enqueued_jobs { post login_path, params: { email: email }, env: env }
   end
 
+  # The CSP nonce is fresh for every response: everything else must match.
+  def answer
+    [ response.status, response.body.gsub(request.content_security_policy_nonce, "nonce") ]
+  end
+
   def link_path_from_last_email
     URI(ActionMailer::Base.deliveries.last.text_part.body.decoded[%r{http://\S+/login/\S+}]).path
   end
@@ -66,10 +71,10 @@ RSpec.describe "Magic link sign-in", type: :request do
 
   it "answers an unknown email exactly like a known one and creates a declarant" do
     request_link("lea.martin@example.com")
-    known = [ response.status, response.body ]
+    known = answer
 
     expect { request_link("nouveau@example.com") }.to change(User, :count).by(1)
-    expect([ response.status, response.body ]).to eq(known)
+    expect(answer).to eq(known)
     expect(response.body).to include("Vérifiez votre boîte")
     expect(ActionMailer::Base.deliveries.last.to).to eq([ "nouveau@example.com" ])
     expect(User.find_by(email: "nouveau@example.com")).to have_attributes(role: "declarant")
@@ -115,28 +120,48 @@ RSpec.describe "Magic link sign-in", type: :request do
     end
 
     it "allows 5 requests in 3 minutes per client, then answers 429" do
-      5.times { request_link("lea.martin@example.com") }
+      5.times { |n| request_link("personne#{n}@example.com") }
       expect(response).to have_http_status(:ok)
 
-      request_link("lea.martin@example.com")
+      request_link("personne5@example.com")
       expect(response).to have_http_status(:too_many_requests)
       expect(response.body).to include("Trop de demandes")
 
-      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.8" })
+      request_link("personne6@example.com", env: { "REMOTE_ADDR" => "203.0.113.8" })
       expect(response).to have_http_status(:ok)
 
       travel 3.minutes + 1.second do
-        request_link("lea.martin@example.com")
+        request_link("personne7@example.com")
         expect(response).to have_http_status(:ok)
       end
     end
 
-    it "keys the limit on the IP fingerprint, never on the IP" do
+    it "sends 3 links an hour per address, whatever the client, with the generic answer" do
+      3.times { |n| request_link(" Lea.Martin@example.com ", env: { "REMOTE_ADDR" => "203.0.113.#{n + 10}" }) }
+      expect(ActionMailer::Base.deliveries.size).to eq(3)
+
+      request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.20" })
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Vérifiez votre boîte de réception")
+      expect(ActionMailer::Base.deliveries.size).to eq(3)
+
+      request_link("autre@example.com", env: { "REMOTE_ADDR" => "203.0.113.20" })
+      expect(ActionMailer::Base.deliveries.size).to eq(4)
+
+      travel 1.hour + 1.second do
+        request_link("lea.martin@example.com", env: { "REMOTE_ADDR" => "203.0.113.21" })
+        expect(ActionMailer::Base.deliveries.size).to eq(5)
+      end
+    end
+
+    it "keys the limits on fingerprints, never on the IP or the address" do
       request_link("lea.martin@example.com")
 
-      expect(keys).not_to be_empty
-      expect(keys).to all(include(IpFingerprint.for(ActionDispatch::Request.new("REMOTE_ADDR" => ip))))
+      expect(keys.size).to eq(2)
+      expect(keys.join).to include(IpFingerprint.for(ActionDispatch::Request.new("REMOTE_ADDR" => ip)))
+      expect(keys.join).to include(User.email_fingerprint("lea.martin@example.com"))
       expect(keys.join).not_to include(ip)
+      expect(keys.join).not_to include("lea.martin")
     end
   end
 
