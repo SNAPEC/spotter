@@ -10,6 +10,7 @@ class Report < ApplicationRecord
 
   class InvalidTransition < StandardError; end
   class NotAllowed < StandardError; end
+  class DigestIncomplete < StandardError; end
 
   include Lifecycle
 
@@ -119,25 +120,29 @@ class Report < ApplicationRecord
   end
 
   # One mail per declarant at a fixed time, whatever the number of reports and nothing of them: the mail
-  # provider's log tells neither when a question was asked nor on which report. Reports are marked in one
-  # transaction, under their row lock, so a rerun sends nothing twice; mails are queued after the commit
-  # and carry only the user. Without a live ownership or with a deactivated account, nothing is sent.
+  # provider's log tells neither when a question was asked nor on which report. The mail carries only the
+  # user. Without a live ownership or with a deactivated account, nothing is sent.
+  #
+  # At least once: a duplicate neutral mail costs nothing, a lost one stalls the exchange. Each user's
+  # mail is queued before their reports are marked, so a failed enqueue leaves them for the next run;
+  # each report is marked in its own transaction, so one report cannot hold back the others.
   def self.notify_declarants
-    user_ids = transaction do
-      awaiting_declarant_notice.find_each.filter_map do |report|
-        report.with_lock do
-          next if report.declarant_notified? || !report.under_analysis? || !report.awaiting_clarification?
+    reports_by_user_id = awaiting_declarant_notice.find_each.select(&:awaiting_clarification?).group_by do |report|
+      ReportOwnership.live.find_by(report_id: report.id)&.user_ref
+    end.except(nil)
 
-          user = ReportOwnership.live.find_by(report_id: report.id)&.user
-          next unless user&.active?
-
-          report.update!(declarant_notified: true)
-          user.id
-        end
-      end
+    unsent = User.active.where(id: reports_by_user_id.keys).find_each.reject do |user|
+      queued = ClarificationMailer.digest(user).deliver_later
+      reports_by_user_id[user.id.to_s].each(&:mark_declarant_notified) if queued
+      queued
     end
+    raise Report::DigestIncomplete if unsent.any?
+  end
 
-    User.active.where(id: user_ids.uniq).find_each { |user| ClarificationMailer.digest(user).deliver_later }
+  def mark_declarant_notified
+    with_lock do
+      update_column(:declarant_notified, true) if under_analysis? && awaiting_clarification?
+    end
   end
 
   # Authorisation comes before any state check, so a stranger learns nothing about the thread.

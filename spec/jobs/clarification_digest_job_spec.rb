@@ -75,6 +75,40 @@ RSpec.describe ClarificationDigestJob, type: :job do
     expect(enqueued_jobs.sole.to_s).not_to include(report.id)
   end
 
+  it "mails a user with a new round on another report, besides an already notified one" do
+    asked(lea)
+    digest_recipients
+    other = asked(lea)
+
+    expect(digest_recipients).to eq([ "lea.martin@example.com" ])
+    expect(other.reload).to be_declarant_notified
+  end
+
+  it "does not let an invalid report hold back the others" do
+    broken = asked(lea)
+    broken.update_column(:discipline, "inexistante")
+    asked(marc)
+
+    expect(broken.reload).not_to be_valid
+    expect(digest_recipients).to contain_exactly("lea.martin@example.com", "marc.petit@example.com")
+  end
+
+  it "leaves the reports unmarked when the mail cannot be queued, and sends it on the next run" do
+    report = asked(lea)
+    failing_adapter = Class.new(ActiveJob::QueueAdapters::AbstractAdapter) do
+      def enqueue(_job) = raise(ActiveJob::EnqueueError, "queue unavailable")
+    end.new
+    allow(ClarificationMailDeliveryJob).to receive(:queue_adapter).and_return(failing_adapter)
+
+    expect { described_class.perform_now }.not_to raise_error
+    expect(report.reload).not_to be_declarant_notified
+    expect(enqueued_jobs.map { |job| job["job_class"] }).to include("ClarificationDigestJob")
+
+    allow(ClarificationMailDeliveryJob).to receive(:queue_adapter).and_call_original
+    expect(digest_recipients).to eq([ "lea.martin@example.com" ])
+    expect(report.reload).to be_declarant_notified
+  end
+
   it "sends nothing to a deactivated account" do
     report = asked(lea)
     lea.update!(deactivated_at: Time.current)
