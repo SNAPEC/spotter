@@ -19,9 +19,21 @@ RSpec.describe "Passkeys", type: :system do
       hasResidentKey: true, hasUserVerification: true, isUserVerified: true,
       automaticPresenceSimulation: true
     })
+    # Kept in sessionStorage so violations survive full page loads as well as Turbo visits.
+    browser.execute_cdp("Page.addScriptToEvaluateOnNewDocument", source: <<~JS)
+      document.addEventListener("securitypolicyviolation", event => {
+        const violations = JSON.parse(sessionStorage.getItem("csp-violations") || "[]")
+        violations.push(`${event.violatedDirective} ${event.blockedURI}`)
+        sessionStorage.setItem("csp-violations", JSON.stringify(violations))
+      })
+    JS
   end
 
   after { Capybara.app_host = nil }
+
+  def csp_violations
+    JSON.parse(page.evaluate_script("sessionStorage.getItem('csp-violations') || '[]'"))
+  end
 
   def sign_in(user)
     path = magic_link_path(user.reload.magic_link_token)
@@ -60,5 +72,6 @@ RSpec.describe "Passkeys", type: :system do
 
     expect(page).to have_current_path("/analyst")
     expect(page).to have_css("h1", text: "Analyse")
+    expect(csp_violations).to be_empty
   end
 end
