@@ -12,12 +12,12 @@ RSpec.describe PurgeUnusedAccountsJob, type: :job do
   end
 
   def make_due(user)
-    user.update_columns(purge_on: Date.current.prev_month.end_of_month)
+    user.update_columns(purge_on: Date.current.beginning_of_quarter.prev_day)
   end
 
   describe "a declarant who never signed in" do
-    it "is kept until the end of the month 30 days after creation, then deleted" do
-      user = travel_to(Date.new(2026, 11, 17)) { declarant }
+    it "is kept until the end of the quarter 30 days after creation, then deleted" do
+      user = travel_to(Date.new(2026, 10, 5)) { declarant }
 
       expect(user.purge_on).to eq(Date.new(2026, 12, 31))
       run_on(Date.new(2026, 12, 31))
@@ -29,7 +29,7 @@ RSpec.describe PurgeUnusedAccountsJob, type: :job do
   end
 
   describe "a declarant who signed in" do
-    it "is kept until the end of the month 12 months after the last session expired" do
+    it "is kept until the end of the quarter 12 months after the last session expired" do
       user = travel_to(Date.new(2026, 11, 17)) { declarant.tap { |user| user.sessions.create! } }
       expect(user.reload.purge_on).to eq(Date.new(2027, 12, 31))
 
@@ -46,7 +46,7 @@ RSpec.describe PurgeUnusedAccountsJob, type: :job do
       travel_to(Date.new(2027, 6, 3)) { user.sessions.create! }
       travel_to(Date.new(2027, 6, 4)) { user.sessions.create!(expires_on: Date.new(2027, 6, 30)) }
 
-      expect(user.reload.purge_on).to eq(Date.new(2028, 7, 31))
+      expect(user.reload.purge_on).to eq(Date.new(2028, 9, 30))
     end
 
     it "is kept while a session is left" do

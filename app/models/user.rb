@@ -3,7 +3,7 @@ class User < ApplicationRecord
   MINIMUM_ADMINS = 2
   ENROLLMENT_CODE_VALIDITY = 7.days
   # Declarant accounts nobody uses are purged: never signed in, 30 days after creation; otherwise
-  # 12 months after the last session expired. Both rounded up to the end of a month.
+  # 12 months after the last session expired. Both rounded up to the end of a quarter.
   UNUSED_ACCOUNT_DELAY = 30.days
   DORMANT_ACCOUNT_DELAY = 12.months
 
@@ -30,7 +30,7 @@ class User < ApplicationRecord
       .where.not(id: AuditEvent.where(subject_type: name).select(:subject_id))
   }
 
-  attribute :purge_on, :date, default: -> { (Date.current + UNUSED_ACCOUNT_DELAY).end_of_month }
+  attribute :purge_on, :date, default: -> { (Date.current + UNUSED_ACCOUNT_DELAY).end_of_quarter }
 
   encrypts :email, deterministic: true, downcase: true
   normalizes :email, with: ->(email) { email.strip }
@@ -124,7 +124,7 @@ class User < ApplicationRecord
 
   # Pushed forward only: an older session created later never brings the date back.
   def postpone_purge!(session_expires_on:)
-    purge_on = (session_expires_on + DORMANT_ACCOUNT_DELAY).end_of_month
+    purge_on = (session_expires_on + DORMANT_ACCOUNT_DELAY).end_of_quarter
     User.where(id: id, purge_on: ...purge_on).update_all(purge_on: purge_on)
   end
 
