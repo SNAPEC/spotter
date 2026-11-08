@@ -12,9 +12,9 @@ RSpec.describe AnalyzeReportJob, type: :job do
     end
   end
 
-  it "is enqueued by submit! with the report as its only argument" do
-    expect { report.submit! }.to have_enqueued_job(described_class).with(report).exactly(:once)
-    expect(enqueued_jobs.sole["arguments"]).to eq([ { "_aj_globalid" => report.to_global_id.to_s } ])
+  it "is enqueued by submit! with the report and its content revision as its only arguments" do
+    expect { report.submit! }.to have_enqueued_job(described_class).with(report, 0).exactly(:once)
+    expect(enqueued_jobs.sole["arguments"]).to eq([ { "_aj_globalid" => report.to_global_id.to_s }, 0 ])
   end
 
   it "is enqueued only once the submission commits" do
@@ -39,7 +39,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
   it "analyses the report once, even when run again" do
     report.submit!
     perform_enqueued_jobs
-    described_class.perform_now(report)
+    described_class.perform_now(report, report.content_revision)
 
     analysis = Analysis.where(report_id: report.id).sole
     expect(analysis.provider).to be_present
@@ -62,7 +62,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
     it "records a failed analysis after its last attempt and hands the report over, once" do
       report.submit!
       5.times { perform_enqueued_jobs }
-      described_class.perform_now(report)
+      described_class.perform_now(report, report.content_revision)
 
       expect(Analysis.where(report_id: report.id).sole).to have_attributes(status: "failed", proposals: {})
       expect(report.reload).to be_in_validation

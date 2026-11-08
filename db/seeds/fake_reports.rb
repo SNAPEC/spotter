@@ -87,7 +87,7 @@ begin
       next
     end
 
-    spec[:failed_analysis] ? analyzer.record_failure(report) : analyzer.call(report)
+    spec[:failed_analysis] ? analyzer.record_failure(report, revision: report.content_revision) : analyzer.call(report, revision: report.content_revision)
     report.ask_clarification!(analyst, spec[:clarification]) if spec[:clarification]
     case spec[:status]
     when "validated" then report.validate!(analyst)

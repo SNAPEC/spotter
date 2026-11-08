@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_150002) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_190001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -22,7 +22,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_150002) do
     t.index ["report_id"], name: "index_access_logs_on_report_id"
     t.index ["user_id"], name: "index_access_logs_on_user_id"
     t.check_constraint "EXTRACT(day FROM recorded_on) = 1::numeric", name: "access_logs_recorded_on_month_check"
-    t.check_constraint "action::text = ANY (ARRAY['view'::character varying::text, 'ask_clarification'::character varying::text, 'validate'::character varying::text, 'reject'::character varying::text])", name: "access_logs_action_check"
+    t.check_constraint "action::text = ANY (ARRAY['view'::character varying, 'take_charge'::character varying, 'ask_clarification'::character varying, 'validate'::character varying, 'reject'::character varying]::text[])", name: "access_logs_action_check"
   end
 
   create_table "analyses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -119,11 +119,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_150002) do
     t.string "draft_token_digest"
     t.string "tracking_code_digest"
     t.boolean "declarant_notified", default: false, null: false
+    t.boolean "taken_in_charge", default: false, null: false
+    t.integer "content_revision", default: 0, null: false
+    t.date "editable_until"
     t.index ["draft_expires_on"], name: "index_reports_on_draft_expires_on"
     t.index ["draft_token_digest"], name: "index_reports_on_draft_token_digest", unique: true
     t.index ["status"], name: "index_reports_on_status"
     t.index ["taxonomy_version_id"], name: "index_reports_on_taxonomy_version_id"
     t.index ["tracking_code_digest"], name: "index_reports_on_tracking_code_digest", unique: true
+    t.check_constraint "editable_until IS NULL OR taken_in_charge = false AND (status::text = ANY (ARRAY['submitted'::character varying, 'analyzing'::character varying, 'in_validation'::character varying]::text[]))", name: "reports_editable_until_check"
     t.check_constraint "event_type::text = ANY (ARRAY['accident'::character varying::text, 'incident'::character varying::text, 'near_miss'::character varying::text])", name: "reports_event_type_check"
     t.check_constraint "mode::text = ANY (ARRAY['confidential'::character varying::text, 'anonymous'::character varying::text])", name: "reports_mode_check"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'submitted'::character varying::text, 'analyzing'::character varying::text, 'in_validation'::character varying::text, 'validated'::character varying::text, 'rejected'::character varying::text])", name: "reports_status_check"

@@ -13,7 +13,7 @@ RSpec.describe Report::Analyzer, type: :model do
   end
 
   def analyze(extractor = Llm::FakeExtractor.new)
-    described_class.new(extractor: extractor).call(report)
+    described_class.new(extractor: extractor).call(report, revision: report.content_revision)
   end
 
   describe "#call" do
@@ -28,7 +28,7 @@ RSpec.describe Report::Analyzer, type: :model do
     end
 
     it "uses the configured extractor by default" do
-      expect(described_class.new.call(report).provider).to eq("fake")
+      expect(described_class.new.call(report, revision: report.content_revision).provider).to eq("fake")
     end
 
     it "keeps a single analysis per prompt version" do
@@ -94,6 +94,27 @@ RSpec.describe Report::Analyzer, type: :model do
       expect(report.reload).to be_analyzing
     end
 
+    it "writes nothing when the content changed while the extractor ran" do
+      extractor = Llm::FakeExtractor.new
+      edited = report
+      extractor.define_singleton_method(:extract) do |text:, schema:|
+        Report.where(id: edited.id).update_all("content_revision = content_revision + 1")
+        super(text: text, schema: schema)
+      end
+
+      expect(analyze(extractor)).to be_nil
+      expect(Analysis.where(report_id: report.id)).to be_empty
+      expect(report.reload).to be_analyzing
+    end
+
+    it "does not start a report whose content changed since it was asked" do
+      stale = report.content_revision
+      Report.where(id: report.id).update_all("content_revision = content_revision + 1")
+
+      expect(described_class.new.call(report, revision: stale)).to be_nil
+      expect(report.reload).to be_submitted
+    end
+
     it "refuses proposals outside the schema and keeps the report in analysis" do
       extractor = Llm::FakeExtractor.new
       def extractor.extract(text:, schema:) = { "weather" => { "value" => "snowstorm", "excerpt" => "x" } }
@@ -107,8 +128,8 @@ RSpec.describe Report::Analyzer, type: :model do
   describe "#record_failure" do
     it "records a failed analysis without proposals and hands the report over for manual coding, once" do
       report.start_analysis!
-      first = described_class.new.record_failure(report)
-      second = described_class.new.record_failure(report)
+      first = described_class.new.record_failure(report, revision: report.content_revision)
+      second = described_class.new.record_failure(report, revision: report.content_revision)
 
       expect(second).to eq(first)
       expect(first).to have_attributes(status: "failed", provider: "fake", proposals: {})
@@ -117,14 +138,23 @@ RSpec.describe Report::Analyzer, type: :model do
     end
 
     it "also takes a report still waiting for its analysis" do
-      expect(described_class.new.record_failure(report).status).to eq("failed")
+      expect(described_class.new.record_failure(report, revision: report.content_revision).status).to eq("failed")
       expect(report.reload).to be_in_validation
+    end
+
+    it "writes nothing for a content that changed since it was asked" do
+      stale = report.content_revision
+      Report.where(id: report.id).update_all("content_revision = content_revision + 1")
+
+      expect(described_class.new.record_failure(report, revision: stale)).to be_nil
+      expect(Analysis.where(report_id: report.id)).to be_empty
+      expect(report.reload).to be_submitted
     end
 
     it "leaves a decided report alone" do
       report.reject!(analyst)
 
-      expect(described_class.new.record_failure(report)).to be_nil
+      expect(described_class.new.record_failure(report, revision: report.content_revision)).to be_nil
       expect(Analysis.where(report_id: report.id)).to be_empty
     end
   end

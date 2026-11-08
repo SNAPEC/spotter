@@ -28,7 +28,7 @@ RSpec.describe Report::Lifecycle, type: :model do
   def in_validation(mode: "confidential")
     draft(mode: mode).tap do |report|
       report.submit!
-      Report::Analyzer.new.call(report)
+      Report::Analyzer.new.call(report, revision: report.content_revision)
     end
   end
 
@@ -195,7 +195,7 @@ RSpec.describe Report::Lifecycle, type: :model do
         it "leaves no raw text, no ownership and no digest after #{decision} (#{mode})" do
           report = draft(mode: mode)
           code = report.submit!
-          Report::Analyzer.new.call(report)
+          Report::Analyzer.new.call(report, revision: report.content_revision)
           report.update_column(:draft_token_digest, "leftover")
           narrative_id = report.narrative.id
           report.analyses.sole.update!(modifications: { "anonymized_text" => "Récit fictif retouché." })
