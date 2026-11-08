@@ -34,6 +34,19 @@ RSpec.describe Llm::FakeExtractor do
     expect(result.values.map { |proposal| proposal["excerpt"] }).to all(eq("Chute fictive au deuxième point."))
   end
 
+  it "answers some fields with null and an empty excerpt when the schema allows it" do
+    nullable = schema.merge("properties" => schema["properties"].transform_values do |property|
+      value = { "anyOf" => [ property.dig("properties", "value"), { "type" => "null" } ] }
+      property.merge("properties" => property["properties"].merge("value" => value))
+    end)
+    results = 20.times.map { |index| extractor.extract(text: "Récit fictif numéro #{index}.", schema: nullable) }
+    proposals = results.flat_map(&:values)
+
+    expect(proposals.select { |proposal| proposal["value"].nil? }).to be_present.and(all(include("excerpt" => "")))
+    expect(results.pluck("weather").pluck("value").compact).to all(be_in(%w[good rain wind]))
+    expect(results.pluck("clients_count").pluck("value").compact).to all(be_a(Integer))
+  end
+
   it "gives the same answer for the same text" do
     expect(extractor.extract(text: text, schema: schema)).to eq(described_class.new.extract(text: text.dup, schema: schema))
   end

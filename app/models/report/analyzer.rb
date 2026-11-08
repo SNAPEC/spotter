@@ -89,7 +89,8 @@ class Report::Analyzer
         when "multi" then { "type" => "array", "items" => { "enum" => field.options.map(&:code) } }
         when "integer" then { "type" => "integer", "minimum" => 0 }
         end
-        [ field.code, closed_object("value" => value, "excerpt" => { "type" => "string" }) ]
+        # null is the extractor's "not stated": better than a guess, and the excerpt is then empty.
+        [ field.code, closed_object("value" => { "anyOf" => [ value, { "type" => "null" } ] }, "excerpt" => { "type" => "string" }) ]
       end
       closed_object(properties)
     end
@@ -110,7 +111,8 @@ class Report::Analyzer
       end
       raise InvalidProposals, "malformed: #{malformed.keys.join(", ")}" if malformed.any?
 
-      codes = report.taxonomy_version.validate_answers(proposals.transform_values { |proposal| proposal["value"] }, scope: :report)
+      values = proposals.transform_values { |proposal| proposal["value"] }
+      codes = report.taxonomy_version.validate_answers(values, scope: :report, allow_unstated: true)
       raise InvalidProposals, codes.join(", ") if codes.any?
     end
 end

@@ -1,6 +1,7 @@
 # Stands in for the LLM: no network, and the same text always gets the same proposals, so specs and
 # local runs are reproducible. Answers each schema property with a value and the text's first sentence
-# as excerpt, the way the real extractor quotes the narrative.
+# as excerpt, the way the real extractor quotes the narrative; about one field in five is "not stated"
+# (null, empty excerpt), so that answer is exercised too.
 class Llm::FakeExtractor
   def provider
     "fake"
@@ -17,7 +18,13 @@ class Llm::FakeExtractor
   def extract(text:, schema:)
     excerpt = text.to_s.strip[/\A[^.!?\n]*[.!?]?/]
     schema.fetch("properties").to_h do |code, property|
-      [ code, { "value" => value_for(text, code, property.dig("properties", "value")), "excerpt" => excerpt } ]
+      value_schema = property.dig("properties", "value")
+      if value_schema.key?("anyOf") && seed(text, "#{code}:stated") % 5 == 0
+        [ code, { "value" => nil, "excerpt" => "" } ]
+      else
+        stated = value_schema.fetch("anyOf", [ value_schema ]).find { |option| option["type"] != "null" }
+        [ code, { "value" => value_for(text, code, stated), "excerpt" => excerpt } ]
+      end
     end
   end
 

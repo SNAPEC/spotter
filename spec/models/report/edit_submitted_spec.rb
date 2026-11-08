@@ -29,8 +29,9 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
     report.reload
   end
 
+  # A field not stated has an empty excerpt.
   def excerpts(report)
-    Analysis.where(report_id: report.id).flat_map { |analysis| analysis.proposals.values.pluck("excerpt") }.uniq
+    Analysis.where(report_id: report.id).flat_map { |analysis| analysis.proposals.values.pluck("excerpt") }.compact_blank.uniq
   end
 
   def stored_text(report)
