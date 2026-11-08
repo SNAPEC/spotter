@@ -144,12 +144,13 @@ RSpec.describe ClarificationDigestJob, type: :job do
     expect(report.reload).not_to be_declarant_notified
   end
 
-  it "is scheduled daily at 7:00, Paris time" do
+  it "is scheduled weekly on Monday at 7:00, Paris time" do
     recurring = Rails.application.config_for(:recurring, env: "production")
 
     expect(recurring[:clarification_digest]).to include(class: "ClarificationDigestJob")
     cron = Fugit.parse_cron(recurring[:clarification_digest][:schedule])
     expect(cron.timezone.name).to eq("Europe/Paris")
-    expect(cron.next_time(Time.utc(2026, 11, 17, 12)).to_t.utc).to eq(Time.utc(2026, 11, 18, 6))
+    expect(cron.next_time(Time.utc(2026, 11, 17, 12)).to_t.utc).to eq(Time.utc(2026, 11, 23, 6))
+    expect(cron.next_time(Time.utc(2027, 6, 1, 12)).to_t.utc).to eq(Time.utc(2027, 6, 7, 5))
   end
 end

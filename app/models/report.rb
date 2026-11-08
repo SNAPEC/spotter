@@ -105,7 +105,7 @@ class Report < ApplicationRecord
   end
 
   # No mail leaves now: its time in the mail provider's log would date the question. A report that
-  # starts waiting for the declarant opens a new round for the daily digest; a second question in a row
+  # starts waiting for the declarant opens a new round for the weekly digest; a second question in a row
   # stays in the same round.
   def ask_clarification!(analyst, body)
     raise Report::NotAllowed, "only staff ask for clarification" unless analyst&.staff?

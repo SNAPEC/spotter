@@ -19,9 +19,10 @@ production:
   purge_expired_drafts:
     class: PurgeExpiredDraftsJob
     schedule: every day at 3am
+  # Weekly, so a digest's time in the mail provider's log points to a week of questions, not to one.
   clarification_digest:
     class: ClarificationDigestJob
-    schedule: "0 7 * * * Europe/Paris"
+    schedule: "0 7 * * 1 Europe/Paris"
   clear_solid_queue_finished_jobs:
     command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
     schedule: every hour at minute 12
