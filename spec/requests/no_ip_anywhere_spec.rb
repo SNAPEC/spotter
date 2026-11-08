@@ -73,6 +73,9 @@ RSpec.describe "No IP address anywhere", type: :request do
     post login_path, params: { email: declarant.email }, env: env, headers: { "Client-IP" => spoofed_ip, "X-Forwarded-For" => ip }
     expect(response).to have_http_status(:bad_request)
 
+    # Any mounted app logs on its own; Action Cable, for one, logged the client address.
+    get "/cable", env: env
+
     sign_in_over_http(analyst.email)
     post recovery_code_path, params: { code: analyst.generate_recovery_codes!.first }, env: env
     get analyst_root_path, env: env
