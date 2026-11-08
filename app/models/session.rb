@@ -2,6 +2,7 @@ class Session < ApplicationRecord
   belongs_to :user
 
   validate :user_is_active, on: :create
+  after_create { user.postpone_purge!(session_expires_on: expires_on) }
 
   attribute :expires_on, :date, default: -> { Date.current.next_month.end_of_month }
 

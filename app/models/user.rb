@@ -2,6 +2,10 @@ class User < ApplicationRecord
   ROLES = %w[declarant analyst admin].freeze
   MINIMUM_ADMINS = 2
   ENROLLMENT_CODE_VALIDITY = 7.days
+  # Declarant accounts nobody uses are purged: never signed in, 30 days after creation; otherwise
+  # 12 months after the last session expired. Both rounded up to the end of a month.
+  UNUSED_ACCOUNT_DELAY = 30.days
+  DORMANT_ACCOUNT_DELAY = 12.months
 
   class PasskeyResetNotAllowed < StandardError; end
   class EnrollmentNotAllowed < StandardError; end
@@ -18,6 +22,9 @@ class User < ApplicationRecord
 
   scope :staff, -> { where(role: %w[analyst admin]) }
   scope :active, -> { where(deactivated_at: nil) }
+  scope :purge_due, -> { declarant.where(purge_on: ...Date.current) }
+
+  attribute :purge_on, :date, default: -> { (Date.current + UNUSED_ACCOUNT_DELAY).end_of_month }
 
   encrypts :email, deterministic: true, downcase: true
   normalizes :email, with: ->(email) { email.strip }
@@ -41,6 +48,14 @@ class User < ApplicationRecord
   def self.email_fingerprint(email)
     OpenSSL::HMAC.hexdigest("SHA256", Rails.application.key_generator.generate_key("email_fingerprint", 32),
       email.to_s.strip.downcase)
+  end
+
+  def self.purge_unused
+    purge_due.find_each do |user|
+      user.purge_if_unused!
+    rescue ActiveRecord::RecordNotFound
+      next
+    end
   end
 
   def self.sign_in_with_magic_link(token)
@@ -82,6 +97,20 @@ class User < ApplicationRecord
     return false if deactivated? || RecoveryCode.normalize(code).empty?
 
     recovery_codes.where(digest: RecoveryCode.digest(code)).delete_all == 1
+  end
+
+  # Pushed forward only: an older session created later never brings the date back.
+  def postpone_purge!(session_expires_on:)
+    purge_on = (session_expires_on + DORMANT_ACCOUNT_DELAY).end_of_month
+    User.where(id: id, purge_on: ...purge_on).update_all(purge_on: purge_on)
+  end
+
+  # Hard delete, through the same path as any account deletion. Everything is checked again under the
+  # row lock, which a sign-in creating a session also needs.
+  def purge_if_unused!
+    with_lock do
+      destroy! if declarant? && purge_on < Date.current && sessions.none? && ReportOwnership.of(self).live.none?
+    end
   end
 
   # Signing out everywhere too: whoever held the lost passkey may hold a verified session.
