@@ -19,6 +19,9 @@ production:
   close_expired_edit_windows:
     class: CloseExpiredEditWindowsJob
     schedule: every day at 3am
+  requeue_stalled_analyses:
+    class: RequeueStalledAnalysesJob
+    schedule: every day at 4am
   purge_expired_drafts:
     class: PurgeExpiredDraftsJob
     schedule: every day at 3am

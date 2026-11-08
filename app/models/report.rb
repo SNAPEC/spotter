@@ -86,6 +86,15 @@ class Report < ApplicationRecord
     where(editable_until: ...Date.current).update_all(editable_until: nil)
   end
 
+  # A report whose analysis job was lost would wait for nothing. Reports carry no time of submission, so
+  # this runs once a day at a fixed hour; a job still running for a report enqueued just before is
+  # harmless, the analyzer writes once per revision.
+  def self.requeue_stalled_analyses
+    where(status: %w[submitted analyzing]).where.not(id: Analysis.select(:report_id)).find_each do |report|
+      AnalyzeReportJob.perform_later(report, report.content_revision)
+    end
+  end
+
   # Destroying under the row lock: a draft saved meanwhile has a new expiry and is kept.
   def self.purge_expired_drafts
     expired_drafts.find_each do |report|
