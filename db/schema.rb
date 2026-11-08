@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_210001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_210002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -73,8 +73,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_210001) do
     t.text "debrief_do_differently"
     t.text "debrief_changes_made"
     t.text "debrief_message"
-    t.text "anonymized_text"
-    t.jsonb "anonymized_debrief"
     t.text "free_text_answers"
     t.index ["report_id"], name: "index_narratives_on_report_id", unique: true
   end
