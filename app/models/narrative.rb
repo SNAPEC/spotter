@@ -18,6 +18,7 @@ class Narrative < ApplicationRecord
 
   validates :raw_text, length: { maximum: RAW_TEXT_MAX_LENGTH }
   validates(*DEBRIEF_FIELDS, length: { maximum: DEBRIEF_MAX_LENGTH })
+  before_validation :drop_blank_free_text_answers
   validate :free_text_answers_fit_taxonomy, if: -> { report&.taxonomy_version }
 
   def purge_raw!
@@ -27,6 +28,13 @@ class Narrative < ApplicationRecord
   private
     def kept_after_decision?
       free_text_answers.blank? && [ "raw_text", *DEBRIEF_FIELDS ].all? { |field| self[field].nil? }
+    end
+
+    def drop_blank_free_text_answers
+      return unless free_text_answers.is_a?(Hash)
+
+      kept = free_text_answers.reject { |_code, answer| answer.nil? || (answer.is_a?(String) && answer.blank?) }
+      self.free_text_answers = kept unless kept == free_text_answers
     end
 
     def free_text_answers_fit_taxonomy

@@ -5,6 +5,7 @@ class Casualty < ApplicationRecord
 
   normalizes :severity, with: ->(value) { value.presence }
 
+  before_validation :cast_answers, if: -> { report&.taxonomy_version }
   validate :severity_is_an_option, :answers_fit_taxonomy, if: -> { report&.taxonomy_version }
   before_destroy :refuse_once_decided
 
@@ -24,6 +25,11 @@ class Casualty < ApplicationRecord
       return if severity.nil? || taxonomy_version.options_for("severity").any? { |option| option.code == severity }
 
       errors.add(:severity, :inclusion)
+    end
+
+    def cast_answers
+      cast = taxonomy_version.cast_answers(answers, scope: :casualty)
+      self.answers = cast unless cast == answers
     end
 
     def answers_fit_taxonomy

@@ -31,6 +31,7 @@ class Report < ApplicationRecord
   validates :mode, inclusion: { in: MODES }
   validates :status, inclusion: { in: STATUSES }
   validates :event_type, inclusion: { in: EVENT_TYPES }, allow_nil: true
+  before_validation :cast_answers, if: :taxonomy_version
   validate :taxonomy_codes_are_options, :answers_fit_taxonomy, if: :taxonomy_version
 
   scope :expired_drafts, -> { where(status: "draft", draft_expires_on: ...Date.current) }
@@ -229,6 +230,11 @@ class Report < ApplicationRecord
 
         errors.add(column, :inclusion)
       end
+    end
+
+    def cast_answers
+      cast = taxonomy_version.cast_answers(answers, scope: :report)
+      self.answers = cast unless cast == answers
     end
 
     def answers_fit_taxonomy
