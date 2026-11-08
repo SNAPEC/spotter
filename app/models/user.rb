@@ -30,10 +30,11 @@ class User < ApplicationRecord
   end
 
   # Unknown emails get a declarant account so the answer never reveals who is registered. A deactivated
-  # account gets the same answer and no mail.
+  # account gets the same answer and the same
+  # work; the mailer sends nothing for it.
   def self.send_magic_link(email)
     create_or_find_by(email: email).tap do |user|
-      MagicLinkMailer.with(user: user).sign_in.deliver_later if user.persisted? && user.active?
+      MagicLinkMailer.with(user: user).sign_in.deliver_later if user.persisted?
     end
   end
 
@@ -84,6 +85,8 @@ class User < ApplicationRecord
     raise PasskeyResetNotAllowed unless by.admin? && by.active? && by != self && staff? && active?
 
     transaction do
+      raise PasskeyResetNotAllowed unless acting_admin?(by)
+
       passkeys.delete_all
       recovery_codes.delete_all
       sign_out_everywhere!
@@ -99,6 +102,8 @@ class User < ApplicationRecord
 
     RecoveryCode.generate_one.tap do |code|
       transaction do
+        raise EnrollmentNotAllowed unless acting_admin?(by)
+
         update!(
           enrollment_code_digest: RecoveryCode.digest(code, purpose: :enrollment_code),
           enrollment_code_expires_on: Date.current + ENROLLMENT_CODE_VALIDITY
@@ -129,6 +134,7 @@ class User < ApplicationRecord
     raise DeactivationNotAllowed unless by.admin? && by.active? && by != self && staff?
 
     transaction do
+      raise DeactivationNotAllowed unless acting_admin?(by)
       raise TooFewAdmins if admin? && active? && other_admins_count < MINIMUM_ADMINS
 
       deactivated = User.active.where(id: id)
@@ -161,6 +167,13 @@ class User < ApplicationRecord
   end
 
   private
+    # `by` may be a stale object: reread it once the admin rows are locked, in the same id order as
+    # other_admins_count, so a concurrent deactivation of the actor cannot slip through or deadlock.
+    def acting_admin?(by)
+      User.where(role: "admin").order(:id).lock.pluck(:id)
+      by.reload.then { |actor| actor.admin? && actor.active? }
+    end
+
     def keeps_enough_admins
       errors.add(:role, :too_few_admins, count: MINIMUM_ADMINS) if other_admins_count < MINIMUM_ADMINS
     end

@@ -81,6 +81,32 @@ RSpec.describe User, "deactivation", type: :model do
     end
   end
 
+  describe "stale acting admin" do
+    let!(:third) { staff("admin3", "admin") }
+
+    it "is refused by every method once the actor was deactivated elsewhere" do
+      stale = User.find(third.id)
+      analyst.issue_enrollment_code!(by: admin)
+      third.deactivate!(by: admin)
+
+      expect { analyst.deactivate!(by: stale) }.to raise_error(User::DeactivationNotAllowed)
+      expect { analyst.reset_passkeys!(by: User.find(third.id).tap { |u| u.deactivated_at = nil }) }
+        .to raise_error(User::PasskeyResetNotAllowed)
+      expect { analyst.issue_enrollment_code!(by: User.find(third.id).tap { |u| u.deactivated_at = nil }) }
+        .to raise_error(User::EnrollmentNotAllowed)
+      expect(analyst.reload).to be_active
+    end
+
+    it "is refused when the actor was demoted elsewhere" do
+      stale = User.find(third.id)
+      third.update!(role: "analyst")
+
+      expect { analyst.deactivate!(by: stale) }.to raise_error(User::DeactivationNotAllowed)
+      expect { analyst.reset_passkeys!(by: User.find(third.id).tap { |u| u.role = "admin" }) }
+        .to raise_error(User::PasskeyResetNotAllowed)
+    end
+  end
+
   describe "admin minimum" do
     it "refuses to deactivate an admin when fewer than 2 other active admins would remain" do
       expect { other_admin.deactivate!(by: admin) }.to raise_error(User::TooFewAdmins)
@@ -121,17 +147,35 @@ RSpec.describe User, "deactivation", type: :model do
     let(:client) { WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin) }
     let(:deactivated) { staff("parti", "analyst").tap { |user| user.deactivate!(by: admin) } }
 
-    it "sends no magic link mail but answers like for anyone else" do
-      result = nil
-      expect { result = User.send_magic_link(deactivated.email) }.not_to have_enqueued_mail
-      expect(result).to be_persisted
-      expect { User.send_magic_link(admin.email) }.to have_enqueued_mail(MagicLinkMailer, :sign_in)
+    it "does the same work for a deactivated account but the mailer sends nothing" do
+      expect { User.send_magic_link(deactivated.email) }.to have_enqueued_mail(MagicLinkMailer, :sign_in)
+      expect(User.send_magic_link(deactivated.email)).to be_persisted
+
+      perform_enqueued_jobs
+      expect(ActionMailer::Base.deliveries).to be_empty
     end
 
-    it "refuses a magic link token issued before and one generated afterwards" do
-      fresh = deactivated.magic_link_token
+    it "sends nothing for a link queued before the deactivation" do
+      ActionMailer::Base.deliveries.clear
+      user = staff("encours-mail", "analyst")
+      User.send_magic_link(user.email)
+      user.deactivate!(by: admin)
 
-      expect(User.sign_in_with_magic_link(fresh)).to be_nil
+      perform_enqueued_jobs
+
+      expect(ActionMailer::Base.deliveries).to be_empty
+    end
+
+    it "refuses a magic link token issued before the deactivation" do
+      user = staff("avant", "analyst")
+      token = user.magic_link_token
+      user.deactivate!(by: admin)
+
+      expect(User.sign_in_with_magic_link(token)).to be_nil
+    end
+
+    it "refuses a magic link token generated after the deactivation" do
+      expect(User.sign_in_with_magic_link(deactivated.magic_link_token)).to be_nil
     end
 
     it "refuses a magic link even if the token version still matches" do
