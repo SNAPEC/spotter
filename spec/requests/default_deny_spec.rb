@@ -1,11 +1,14 @@
 require "rails_helper"
 
 # Default deny: a new controller must say which roles it serves, or be listed here with the reason.
+# The check is per controller: a `require_role ..., only:` covering some actions passes it for all of
+# them, so a partial `only:` (or `except:`) needs a reviewer's eye on the remaining actions.
 RSpec.describe "Every controller" do
   let(:exemptions) do
     {
       "MagicLinksController" => "sign-in, before any role is known",
       "SessionsController" => "signing out, open to every signed-in role",
+      "CspReportsController" => "browser violation reports, sent outside any session",
       "Dev::LoginsController" => "development only, refused elsewhere",
       "Dev::StyleguideController" => "development only, refused elsewhere"
     }
