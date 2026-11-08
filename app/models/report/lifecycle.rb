@@ -60,7 +60,7 @@ module Report::Lifecycle
         )
         report_ownership&.update!(cutoff_on: Date.current + OWNERSHIP_DAYS)
       end
-      AnalyzeReportJob.perform_later(self)
+      AnalyzeReportJob.perform_later(self, content_revision)
       code
     end
   end

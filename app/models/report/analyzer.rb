@@ -13,20 +13,23 @@ class Report::Analyzer
   end
 
   # Returns the analysis for the extractor's prompt version, or nil when the report is not waiting for
-  # one (decided meanwhile, or already analysed under another prompt version).
-  def call(report)
+  # one (decided meanwhile, already analysed under another prompt version, or edited since: the
+  # revision names the content this run was asked to analyse).
+  def call(report, revision: report.content_revision)
     existing = analysis_of(report)
     return existing if existing
 
-    report.with_lock { report.start_analysis! if report.submitted? }
-    return unless report.analyzing?
+    report.with_lock { report.start_analysis! if report.submitted? && report.content_revision == revision }
+    return unless report.analyzing? && report.content_revision == revision
 
     fields = report.taxonomy_version.fields.where(scope: "report", kind: ANSWER_KINDS).includes(:options)
     proposals = extract(report, fields)
     check!(report, proposals, fields)
 
+    # The declarant may have edited the report while the extractor ran: proposals and excerpts would
+    # then describe a text that no longer exists.
     report.with_lock do
-      next analysis_of(report) unless report.analyzing?
+      next analysis_of(report) unless report.analyzing? && report.content_revision == revision
 
       analysis = report.analyses.create!(
         provider: @extractor.provider, model: @extractor.model, prompt_version: @extractor.prompt_version, proposals: proposals
@@ -38,8 +41,10 @@ class Report::Analyzer
 
   # When the extractor fails for good, the analyst codes the report by hand: a failed analysis takes
   # the prompt version's place, so the job stays idempotent, and the report moves on to validation.
-  def record_failure(report)
+  def record_failure(report, revision: report.content_revision)
     report.with_lock do
+      next unless report.content_revision == revision
+
       existing = analysis_of(report)
       next existing if existing
 
