@@ -1,0 +1,85 @@
+<% content_for :title, t(".title") %>
+<% section_title = "text-xl font-semibold" %>
+
+<div class="space-y-12">
+  <header>
+    <h1 class="text-3xl font-bold"><%= t(".title") %></h1>
+    <p class="mt-2 text-muted"><%= t(".intro") %></p>
+  </header>
+
+  <section class="space-y-4">
+    <h2 class="<%= section_title %>"><%= t(".colors") %></h2>
+    <ul class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <% [
+           %w[bg-brand brand], %w[bg-brand-strong brand-strong], %w[bg-brand-soft brand-soft], %w[bg-ink ink],
+           %w[bg-muted muted], %w[bg-line line], %w[bg-paper paper], %w[bg-surface surface],
+           %w[bg-success success], %w[bg-danger danger], %w[bg-warning warning], %w[bg-focus focus]
+         ].each do |swatch, name| %>
+        <li>
+          <span class="block h-12 rounded-control border border-line <%= swatch %>"></span>
+          <code class="mt-1 block text-sm"><%= name %></code>
+        </li>
+      <% end %>
+    </ul>
+  </section>
+
+  <section class="space-y-3">
+    <h2 class="<%= section_title %>"><%= t(".typography") %></h2>
+    <p class="text-3xl font-bold"><%= t(".heading_1") %></p>
+    <p class="text-xl font-semibold"><%= t(".heading_2") %></p>
+    <p class="max-w-prose"><%= t(".body") %></p>
+    <p class="max-w-prose text-muted"><%= t(".muted") %></p>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="<%= section_title %>"><%= t(".buttons") %></h2>
+    <div class="flex flex-wrap gap-3">
+      <%= render "components/button", label: t(".primary"), type: "button" %>
+      <%= render "components/button", label: t(".secondary"), variant: :secondary, type: "button" %>
+      <%= render "components/button", label: t(".danger"), variant: :danger, type: "button" %>
+      <%= render "components/button", label: t(".link"), variant: :link, href: "#main" %>
+    </div>
+    <%= render "components/button", label: t(".full_width"), full: true, type: "button" %>
+  </section>
+
+  <%= form_with scope: :demo, url: "#", class: "space-y-12", data: { turbo: false } do |form| %>
+    <section class="space-y-6">
+      <h2 class="<%= section_title %>"><%= t(".fields") %></h2>
+      <%= render "components/text_field", form: form, attribute: :email, label: t(".email"), as: :email_field %>
+      <%= render "components/text_field", form: form, attribute: :site, label: t(".site"), hint: t(".site_hint") %>
+      <%= render "components/text_field", form: form, attribute: :code, label: t(".code"), error: t(".code_error") %>
+      <%= render "components/text_field", form: form, attribute: :story, label: t(".story"), as: :text_area, input: { rows: 4 } %>
+    </section>
+
+    <section class="space-y-6">
+      <h2 class="<%= section_title %>"><%= t(".choices") %></h2>
+      <%= render "components/choice_cards", form: form, attribute: :event_type, legend: t(".event_type"), selected: "near_miss",
+        choices: %w[accident incident near_miss].map { |code| [ code, t(".event_types.#{code}.label"), t(".event_types.#{code}.description") ] } %>
+      <%= render "components/choice_cards", form: form, attribute: :setting, legend: t(".setting"), hint: t(".setting_hint"),
+        multiple: true, selected: %w[outdoor],
+        choices: %w[indoor outdoor].map { |code| [ code, t(".settings.#{code}") ] } %>
+    </section>
+  <% end %>
+
+  <section class="space-y-4">
+    <h2 class="<%= section_title %>"><%= t(".steps") %></h2>
+    <%= render "components/steps", steps: t(".step_names"), current: 2 %>
+  </section>
+
+  <section>
+    <h2 class="<%= section_title %>"><%= t(".messages") %></h2>
+    <%= render "components/flash", messages: { notice: t(".notice"), alert: t(".alert") } %>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="<%= section_title %>"><%= t(".empty_state") %></h2>
+    <%= render "components/empty_state", title: t(".empty_title"), body: t(".empty_body"), action_label: t(".empty_action"), action_href: "#main" %>
+  </section>
+
+  <section class="space-y-4">
+    <h2 class="<%= section_title %>"><%= t(".navigation") %></h2>
+    <div class="rounded-card border-2 border-line bg-surface p-3">
+      <%= render "layouts/navigation", user: User.new(role: "admin"), stacked: true %>
+    </div>
+  </section>
+</div>
