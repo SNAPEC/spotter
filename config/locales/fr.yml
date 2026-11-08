@@ -46,9 +46,16 @@ fr:
       title: "Accès refusé"
       body: "Vous n’avez pas les droits nécessaires pour consulter cette page."
   navigation:
+    label: "Navigation principale"
+    menu: "Menu"
+    skip: "Aller au contenu"
     declarant: "Mes signalements"
     analyst: "Analyse"
     admin: "Administration"
+  components:
+    steps:
+      label: "Progression"
+      progress: "Étape %{current} sur %{total} : %{step}"
   declarant:
     home:
       show:
@@ -84,6 +91,60 @@ fr:
         role: "Rôle"
         actions: "Actions"
         sign_in: "Se connecter"
+    styleguide:
+      show:
+        title: "Guide de style"
+        intro: "Disponible en développement seulement. Tous les composants de l’interface, avec des exemples fictifs."
+        colors: "Couleurs"
+        typography: "Typographie"
+        heading_1: "Titre de page"
+        heading_2: "Titre de section"
+        body: "Texte courant : lisible au soleil, sur un téléphone, avec des gants. Les phrases restent courtes et le contraste fort."
+        muted: "Texte secondaire, pour une aide ou une précision."
+        buttons: "Boutons"
+        primary: "Envoyer"
+        secondary: "Enregistrer le brouillon"
+        danger: "Supprimer"
+        link: "Annuler"
+        full_width: "Continuer"
+        fields: "Champs"
+        email: "Adresse e-mail"
+        site: "Type de site"
+        site_hint: "Restez général : « falaise du sud de la France » plutôt que le nom du site."
+        code: "Code de suivi"
+        code_error: "Ce code n’est pas valable."
+        story: "Ce qui s’est passé"
+        choices: "Choix en cartes"
+        event_type: "Type d’évènement"
+        event_types:
+          accident:
+            label: "Accident"
+            description: "Quelqu’un a été blessé."
+          incident:
+            label: "Incident"
+            description: "Un dommage matériel, sans blessé."
+          near_miss:
+            label: "Presque accident"
+            description: "Rien n’est arrivé, mais il s’en est fallu de peu."
+        setting: "Lieu de pratique"
+        setting_hint: "Plusieurs réponses possibles."
+        settings:
+          indoor: "En salle"
+          outdoor: "En extérieur"
+        steps: "Étapes"
+        step_names:
+          - "Évènement"
+          - "Circonstances"
+          - "Personnes"
+          - "Relecture"
+        messages: "Messages"
+        notice: "Brouillon enregistré."
+        alert: "Ce lien n’est plus valable. Demandez-en un nouveau."
+        empty_state: "État vide"
+        empty_title: "Aucun signalement pour l’instant"
+        empty_body: "Un accident, un incident ou un presque accident ? Racontez-le : d’autres moniteurs en tireront des enseignements."
+        empty_action: "Faire un signalement"
+        navigation: "Navigation (administrateur)"
   roles:
     declarant: "Déclarant"
     analyst: "Analyste"

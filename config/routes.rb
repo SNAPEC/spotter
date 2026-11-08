@@ -29,6 +29,7 @@ Rails.application.routes.draw do
   constraints(-> { Rails.env.development? }) do
     namespace :dev do
       resource :login, only: %i[show create]
+      get "styleguide" => "styleguide#show"
     end
   end
 

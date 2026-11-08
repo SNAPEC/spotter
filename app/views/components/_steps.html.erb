@@ -1,0 +1,15 @@
+<%# locals: (steps:, current:) %>
+<%# current is 1-based. On a phone only the bars and the current step's name show. %>
+<nav aria-label="<%= t("components.steps.label") %>">
+  <p class="font-semibold">
+    <%= t("components.steps.progress", current: current, total: steps.size, step: steps[current - 1]) %>
+  </p>
+  <ol class="mt-2 flex gap-1.5">
+    <% steps.each.with_index(1) do |step, position| %>
+      <%= tag.li class: "flex-1", aria: { current: ("step" if position == current) } do %>
+        <span class="block h-2 rounded-full <%= position <= current ? "bg-brand" : "bg-line" %>"></span>
+        <span class="sr-only sm:not-sr-only sm:mt-1.5 sm:block sm:text-sm <%= position == current ? "sm:font-semibold" : "sm:text-muted" %>"><%= step %></span>
+      <% end %>
+    <% end %>
+  </ol>
+</nav>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
   <head>
     <title><%= content_for(:title) || "Spotter" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -23,21 +23,28 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body>
-    <% if authenticated? %>
-      <nav class="container mx-auto px-5 py-3 flex justify-end gap-3">
-        <%= link_to t("navigation.declarant"), root_path, class: "underline" %>
-        <% if Current.user.staff? %>
-          <%= link_to t("navigation.analyst"), analyst_root_path, class: "underline" %>
+  <body class="min-h-dvh bg-paper font-sans text-ink antialiased">
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-gutter focus:top-2 focus:z-20 focus:rounded-control focus:bg-surface focus:px-4 focus:py-3"><%= t("navigation.skip") %></a>
+    <header class="relative border-b border-line bg-surface">
+      <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-gutter py-2">
+        <%= link_to "Spotter", root_path, class: "flex min-h-touch items-center text-xl font-bold text-brand no-underline" %>
+        <% if authenticated? %>
+          <details class="lg:hidden">
+            <summary class="flex min-h-touch cursor-pointer list-none items-center rounded-control border-2 border-line-strong px-4 font-semibold [&::-webkit-details-marker]:hidden"><%= t("navigation.menu") %></summary>
+            <div class="absolute inset-x-0 top-full z-10 border-b border-line bg-surface px-gutter py-3">
+              <%= render "layouts/navigation", user: Current.user, stacked: true %>
+            </div>
+          </details>
+          <div class="hidden lg:block">
+            <%= render "layouts/navigation", user: Current.user %>
+          </div>
         <% end %>
-        <% if Current.user.admin? %>
-          <%= link_to t("navigation.admin"), admin_root_path, class: "underline" %>
-        <% end %>
-        <%= button_to t("sessions.destroy.submit"), session_path, method: :delete, class: "underline cursor-pointer" %>
-        <%= button_to t("sessions.destroy_all.submit"), sessions_path, method: :delete, class: "underline cursor-pointer" %>
-      </nav>
-    <% end %>
-    <main class="container mx-auto mt-28 px-5 flex">
+      </div>
+    </header>
+    <main id="main" class="mx-auto w-full max-w-5xl px-gutter py-8">
+      <% if flash[:notice] || flash[:alert] %>
+        <div class="mb-6"><%= render "components/flash" %></div>
+      <% end %>
       <%= yield %>
     </main>
   </body>

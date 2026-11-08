@@ -3,7 +3,6 @@
 <div class="mx-auto w-full max-w-md">
   <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
   <p class="mt-4"><%= t(".body") %></p>
-  <%= render "shared/flash" %>
 
   <% if Current.session.needs_enrollment_code? && Current.user.enrollment_code_digest.nil? %>
     <p class="mt-6 py-2 px-3 bg-yellow-50 text-yellow-900 rounded" role="status"><%= t(".ask_for_enrollment_code") %></p>

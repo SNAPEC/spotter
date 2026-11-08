@@ -3,18 +3,10 @@
 <div class="mx-auto w-full max-w-md">
   <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
 
-  <% if flash[:notice] %>
-    <p class="mt-4 py-2 px-3 bg-green-50 text-green-800 rounded" role="status"><%= flash[:notice] %></p>
-  <% end %>
 
-  <% if flash[:alert] %>
-    <p class="mt-4 py-2 px-3 bg-red-50 text-red-700 rounded" role="alert"><%= flash[:alert] %></p>
-  <% end %>
-
-  <%= form_with url: login_path, class: "mt-6 space-y-4" do |form| %>
-    <%= form.label :email, t(".email"), class: "block font-medium" %>
-    <%= form.email_field :email, required: true, autofocus: true, autocomplete: "email",
-      class: "block w-full rounded border border-gray-400 px-3 py-2" %>
-    <%= form.submit t(".submit"), class: "rounded px-4 py-2 bg-blue-700 text-white font-medium cursor-pointer" %>
+  <%= form_with url: login_path, class: "mt-6 space-y-6" do |form| %>
+    <%= render "components/text_field", form: form, attribute: :email, label: t(".email"), as: :email_field,
+      input: { required: true, autofocus: true, autocomplete: "email" } %>
+    <%= render "components/button", label: t(".submit"), full: true %>
   <% end %>
 </div>

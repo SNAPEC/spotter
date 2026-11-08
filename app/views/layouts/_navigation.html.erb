@@ -1,0 +1,22 @@
+<%# locals: (user:, stacked: false) %>
+<nav aria-label="<%= t("navigation.label") %>">
+  <ul class="<%= stacked ? "flex flex-col gap-1" : "flex items-center gap-1" %>">
+    <% links = [ [ t("navigation.declarant"), root_path ] ]
+       links << [ t("navigation.analyst"), analyst_root_path ] if user.staff?
+       links << [ t("navigation.admin"), admin_root_path ] if user.admin? %>
+    <% links.each do |label, path| %>
+      <li>
+        <%= link_to label, path, aria: { current: ("page" if current_page?(path)) },
+          class: "flex min-h-touch items-center whitespace-nowrap rounded-control px-3 font-semibold text-ink no-underline hover:bg-brand-soft aria-[current=page]:text-brand aria-[current=page]:underline aria-[current=page]:decoration-2" %>
+      </li>
+    <% end %>
+    <li class="<%= stacked ? "mt-2 border-t border-line pt-2" : "ml-2 border-l border-line pl-2" %>">
+      <%= button_to t("sessions.destroy.submit"), session_path, method: :delete,
+        class: "flex min-h-touch w-full items-center whitespace-nowrap rounded-control px-3 text-muted underline cursor-pointer hover:text-ink" %>
+    </li>
+    <li>
+      <%= button_to t("sessions.destroy_all.submit"), sessions_path, method: :delete,
+        class: "flex min-h-touch w-full items-center whitespace-nowrap rounded-control px-3 text-muted underline cursor-pointer hover:text-ink" %>
+    </li>
+  </ul>
+</nav>

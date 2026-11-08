@@ -113,6 +113,28 @@ RSpec.describe Report::Lifecycle, type: :model do
     end
   end
 
+  describe "access trail" do
+    { validate!: "validate", reject!: "reject" }.each do |decision, action|
+      it "records who decided with #{decision}, and nothing when the transition fails" do
+        report = in_validation
+        report.public_send(decision, analyst)
+
+        expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, action ] ])
+        expect { report.public_send(decision, analyst) }.to raise_error(Report::InvalidTransition)
+        expect(AccessLog.where(report_id: report.id).count).to eq(1)
+      end
+    end
+
+    it "records who asked for a clarification, and nothing when a question is pending" do
+      report = in_validation
+      report.ask_clarification!(analyst, "Question fictive ?")
+
+      expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, "ask_clarification" ] ])
+      expect { report.ask_clarification!(analyst, "Autre question fictive ?") }.to raise_error(Report::InvalidTransition)
+      expect(AccessLog.where(report_id: report.id).count).to eq(1)
+    end
+  end
+
   describe "decided report" do
     %i[validate! reject!].each do |decision|
       it "refuses raw text, debriefing answers and casualty changes after #{decision}" do
@@ -144,6 +166,26 @@ RSpec.describe Report::Lifecycle, type: :model do
           .to raise_error(ActiveRecord::RecordInvalid)
         expect(Report.find(report.id).answers).not_to have_key("material_damage")
         expect(Casualty.where(report_id: report.id).sole.answers).not_to have_key("injury_detail")
+      end
+    end
+
+    %i[validate! reject!].each do |decision|
+      it "refuses excerpts and modifications written back to the analysis after #{decision}" do
+        report = in_validation
+        report.public_send(decision, analyst)
+        analysis = Analysis.find(report.analyses.sole.id)
+        kept = analysis.proposals
+
+        expect { analysis.update!(modifications: { "anonymized_text" => "Récit fictif réinjecté" }) }.to raise_error(ActiveRecord::RecordInvalid)
+        analysis.reload
+        expect { analysis.update!(proposals: kept.merge("cause" => { "value" => "other", "excerpt" => "Récit fictif" })) }
+          .to raise_error(ActiveRecord::RecordInvalid)
+        analysis.reload
+        expect { analysis.update!(proposals: kept.merge("odd" => "Récit fictif")) }.to raise_error(ActiveRecord::RecordInvalid)
+        analysis.reload
+        expect { analysis.update!(status: "reviewed", proposals: kept.merge("cause" => { "value" => "other" })) }.not_to raise_error
+        expect(Analysis.find(analysis.id).modifications).to be_empty
+        expect(Analysis.find(analysis.id).proposals.to_s).not_to include("Récit fictif")
       end
     end
 

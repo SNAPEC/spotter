@@ -1,5 +1,7 @@
 # The extractor's coded proposals for a report, then the analyst's changes and decisions on them.
 class Analysis < ApplicationRecord
+  include ReadOnlyOnceDecided
+
   STATUSES = %w[proposed reviewed failed].freeze
   PROVIDERS = %w[fake scaleway].freeze
 
@@ -14,4 +16,9 @@ class Analysis < ApplicationRecord
   def strip_raw_excerpts!
     update!(proposals: proposals.transform_values { |proposal| proposal.is_a?(Hash) ? proposal.slice("value") : {} }, modifications: {})
   end
+
+  private
+    def kept_after_decision?
+      modifications.blank? && proposals.to_h.values.all? { |proposal| proposal.is_a?(Hash) && (proposal.keys - [ "value" ]).empty? }
+    end
 end
