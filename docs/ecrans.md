@@ -97,7 +97,7 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 2. **Le récit anonymisé.** Prévu par la conception, absent du schéma : à la validation, il ne reste que les réponses codées.
 3. **Les valeurs du formulaire.** Un formulaire envoie des chaînes : un champ `integer` arrive en `"3"`, refusé (`not_an_integer`) ; un choix laissé vide arrive en `""`, refusé (`invalid_option`). Il faut convertir et nettoyer dans le modèle avant la validation.
 4. **« Encore modifiable ? »** Pas de prédicat pour afficher ou non le lien de modification. La condition est dans `edit_submitted!` ; une méthode publique du modèle doit la porter, pas la vue.
-5. **Un brouillon complet.** `submit!` accepte un brouillon vide. Quels champs sont obligatoires avant l'envoi ?
+5. **Un brouillon complet.** `submit!` accepte un brouillon vide. Décidé : seuls le type d'événement et un récit non vide seront obligatoires ; `submit!` refusera sinon, avec une erreur par champ (méthode à venir).
 6. **Le nombre de victimes.** Aucune limite.
 7. **La fin d'adhésion** déclarée par le moniteur : aucune méthode.
 8. **Changer un rôle**, nommer un analyste : aucune méthode (la règle des deux admins est déjà dans la validation de `User`).
