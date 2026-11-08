@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Fast checks on staged files (a few seconds at most).
+set -euo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+# Secrets must never be committed.
+secrets=$(grep -E '(^|/)\.env(\..+)?$|^config/master\.key$|^config/credentials/.*\.key$|^config/.*\.key$' <<<"$staged" | grep -v '\.env\.example$' || true)
+if [ -n "$secrets" ]; then
+  echo "pre-commit: refusing to commit secret files:" >&2
+  echo "$secrets" | sed 's/^/  /' >&2
+  exit 1
+fi
+
+# RuboCop on staged Ruby files, once the Rails app exists.
+ruby_files=$(grep -E '\.(rb|rake)$|(^|/)(Gemfile|Rakefile)$' <<<"$staged" || true)
+if [ -n "$ruby_files" ] && [ -x bin/rubocop ]; then
+  # shellcheck disable=SC2086
+  bin/rubocop --force-exclusion $ruby_files
+fi
