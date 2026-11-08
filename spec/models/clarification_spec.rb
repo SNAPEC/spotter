@@ -94,31 +94,15 @@ RSpec.describe Clarification, type: :model do
         .to raise_error(ActiveRecord::RecordInvalid)
     end
 
-    it "sends the notification after the commit, with the report as its only argument" do
-      report
-      clear_enqueued_jobs
-      Report.transaction do
-        report.ask_clarification!(analyst, "Question fictive ?")
-        expect(enqueued_jobs).to be_empty
-      end
-
-      expect(enqueued_jobs.size).to eq(1)
-      expect(enqueued_jobs.sole["job_class"]).to eq("ClarificationMailDeliveryJob")
-      expect(enqueued_jobs.sole["arguments"].to_s).not_to include("Question", "lea.martin")
-      expect(enqueued_jobs.sole["arguments"].last).to eq("args" => [ { "_aj_globalid" => report.to_global_id.to_s } ], "_aj_ruby2_keywords" => [ "args" ])
-    end
-    it "mails only when the report starts waiting for the declarant" do
-      report
-      clear_enqueued_jobs
-      mails = -> { enqueued_jobs.count { |job| job["job_class"] == "ClarificationMailDeliveryJob" } }
-
+    it "opens a new notification round only when the report starts waiting for the declarant" do
       report.ask_clarification!(analyst, "Première question fictive ?")
+      report.update!(declarant_notified: true)
       report.ask_clarification!(analyst, "Seconde question fictive ?")
-      expect(mails.call).to eq(1)
+      expect(report.reload).to be_declarant_notified
 
       report.answer_clarification!("Réponse fictive.", user: user)
       report.ask_clarification!(analyst, "Troisième question fictive ?")
-      expect(mails.call).to eq(2)
+      expect(report.reload).not_to be_declarant_notified
     end
   end
 

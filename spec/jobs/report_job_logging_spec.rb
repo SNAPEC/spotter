@@ -25,11 +25,11 @@ RSpec.describe "Report job logging", type: :job do
     report.submit!
     perform_enqueued_jobs only: AnalyzeReportJob
     report.reload.ask_clarification!(analyst, "Question fictive ?")
-    perform_enqueued_jobs
+    perform_enqueued_jobs { ClarificationDigestJob.perform_now }
 
     expect(ActionMailer::Base.deliveries.size).to eq(1)
-    expect(io.string).to include("AnalyzeReportJob", "ClarificationMailDeliveryJob")
+    expect(io.string).to include("AnalyzeReportJob", "ClarificationDigestJob", "ClarificationMailDeliveryJob")
     expect(io.string).not_to include(report.id)
-    expect(io.string).not_to include(declarant.email)
+    expect(io.string).not_to include(declarant.email, declarant.to_global_id.to_s)
   end
 end

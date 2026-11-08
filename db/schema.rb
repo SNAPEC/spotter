@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_150001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_150002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -118,6 +118,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_150001) do
     t.date "draft_expires_on"
     t.string "draft_token_digest"
     t.string "tracking_code_digest"
+    t.boolean "declarant_notified", default: false, null: false
     t.index ["draft_expires_on"], name: "index_reports_on_draft_expires_on"
     t.index ["draft_token_digest"], name: "index_reports_on_draft_token_digest", unique: true
     t.index ["status"], name: "index_reports_on_status"

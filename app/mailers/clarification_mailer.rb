@@ -4,19 +4,17 @@ class ClarificationMailer < ApplicationMailer
   self.delivery_job = ClarificationMailDeliveryJob
 
   # A delivery error usually quotes the recipient: re-raised as is, it would land in the failed jobs table
-  # and in Sentry next to the report's GlobalID. It is replaced by a bare error, without its cause.
+  # and in Sentry next to the user's GlobalID. It is replaced by a bare error, without its cause.
   rescue_from "Net::SMTPError", "OpenSSL::SSL::SSLError", IOError, SocketError, SystemCallError, Timeout::Error do
     raise DeliveryFailed, cause: nil
   end
 
-  # The address is looked up at send time through the ownership, never carried by the job. Without a
-  # live link (anonymous report, link cut or due) or to a deactivated account, nothing is sent. The mail carries one link and
-  # nothing of the report, not even the question: it may sit in a mailbox for years.
-  def requested(report)
-    user = ReportOwnership.live.find_by(report_id: report.id)&.user
-    return unless user&.active?
+  # The digest names neither a report nor what is waiting, in the same words for everyone: it may sit
+  # in a mailbox for years. An account deactivated since the digest ran gets nothing.
+  def digest(user)
+    return unless user.reload.active?
 
-    @url = root_url
+    @url = login_url
     mail to: user.email
   end
 end
