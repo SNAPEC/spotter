@@ -68,20 +68,24 @@ module Report::Lifecycle
       transition!(from: from, to: to) { purge_after_decision! }
     end
 
-    # The row lock makes the check and the change atomic, and the purge shares the transaction.
+    # The row lock makes the check and the change atomic. The purge shares the transaction and runs
+    # before the new status, while the report's content is still writable.
     def transition!(from:, to:)
       with_lock do
         raise Report::InvalidTransition, "cannot go from #{status} to #{to}" unless Array(from).include?(status)
 
-        update!(status: to)
         yield if block_given?
+        update!(status: to)
       end
     end
 
-    # Everything that could point back to the author or quote them goes, in one transaction.
+    # Everything that could point back to the author or quote them goes, in one transaction. Free-text
+    # answers go too: only coded answers are kept.
     def purge_after_decision!
+      text_codes = taxonomy_version.fields.where(kind: "text").pluck(:code)
       narrative&.purge_raw!
+      casualties.each { |casualty| casualty.update!(answers: casualty.answers.except(*text_codes)) }
       report_ownership&.destroy!
-      update!(tracking_code_digest: nil, draft_token_digest: nil)
+      assign_attributes(answers: answers.except(*text_codes), tracking_code_digest: nil, draft_token_digest: nil)
     end
 end

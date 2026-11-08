@@ -3,7 +3,12 @@ require "rails_helper"
 RSpec.describe Report::Lifecycle, type: :model do
   include ActiveSupport::Testing::TimeHelpers
 
-  before { TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml")).publish! }
+  # v0 has no free-text casualty field: one is added so the purge of casualty answers is exercised.
+  before do
+    version = TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml"))
+    version.fields.create!(code: "injury_detail", group: "casualty", kind: "text", scope: "casualty", position: 99, label: "Précision")
+    version.publish!
+  end
 
   let(:user) { User.create!(email: "lea.martin@example.com") }
   let(:analyst) { User.create!(email: "chloe.bernard@example.com", role: "analyst") }
@@ -12,8 +17,9 @@ RSpec.describe Report::Lifecycle, type: :model do
     report, = Report.start_draft!(mode: mode, user: (user if mode == "confidential"))
     report.save_draft!(
       event_type: "near_miss",
+      answers: { "material_damage" => "Corde fictive coupée", "weather" => "good", "clients_count" => 4 },
       narrative_attributes: Narrative::DEBRIEF_FIELDS.index_with { "Réponse fictive." }.merge(raw_text: "Récit fictif."),
-      casualties_attributes: [ { severity: "minor" } ]
+      casualties_attributes: [ { severity: "minor", answers: { "injury_detail" => "Détail fictif", "age_range" => "over_60" } } ]
     )
     report
   end
@@ -125,7 +131,9 @@ RSpec.describe Report::Lifecycle, type: :model do
           expect(ReportOwnership.where(report_id: report.id)).to be_empty
           expect(Report.owned_by(user)).to be_empty
           expect(Report.where(id: report.id).pick(:tracking_code_digest, :draft_token_digest)).to eq([ nil, nil ])
-          expect(report.casualties.count).to eq(1)
+          expect(Report.find(report.id).answers).to eq("weather" => "good", "clients_count" => 4)
+          expect(report.casualties.sole.reload.answers).to eq("age_range" => "over_60")
+          expect(report.casualties.sole.severity).to eq("minor")
         end
       end
     end
