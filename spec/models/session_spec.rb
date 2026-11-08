@@ -1,4 +1,5 @@
 require "rails_helper"
+require "webauthn/fake_client"
 
 RSpec.describe Session, type: :model do
   include ActiveSupport::Testing::TimeHelpers
@@ -35,6 +36,36 @@ RSpec.describe Session, type: :model do
 
     it "returns nil for an unknown id" do
       expect(Session.resume(0)).to be_nil
+    end
+  end
+
+  describe "WebAuthn challenge" do
+    let(:analyst) { User.create!(email: "analyste@example.com", role: "analyst") }
+    let(:client) { WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin) }
+
+    before do
+      challenge = Passkey.registration_options_for(analyst).challenge
+      Passkey.register!(user: analyst, credential: client.create(challenge: challenge, user_verified: true).to_json, challenge: challenge)
+    end
+
+    it "is kept on the session row, server-side" do
+      session = analyst.sessions.create!
+
+      options = session.passkey_authentication_options!
+
+      expect(session.reload.webauthn_challenge).to eq(options.challenge)
+    end
+
+    it "verifies only once, even through two copies of the same session" do
+      session = analyst.sessions.create!
+      options = session.passkey_authentication_options!
+      assertion = client.get(challenge: options.challenge, user_verified: true).to_json
+      copy = Session.find(session.id)
+
+      expect(session.verify_passkey(credential: assertion)).to be(true)
+      copy.update_column(:passkey_verified, false)
+      expect(copy.verify_passkey(credential: assertion)).to be(false)
+      expect(session.reload.webauthn_challenge).to be_nil
     end
   end
 end

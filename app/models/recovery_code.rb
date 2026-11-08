@@ -9,24 +9,25 @@ class RecoveryCode < ApplicationRecord
 
   def self.generate
     codes = Set.new
-    codes << Array.new(GROUPS) { SecureRandom.alphanumeric(GROUP_LENGTH, chars: ALPHABET) }.join("-") while codes.size < COUNT
+    codes << generate_one while codes.size < COUNT
     codes.to_a
   end
 
+  # Also used for the one-off enrollment code, which has the same shape.
+  def self.generate_one
+    Array.new(GROUPS) { SecureRandom.alphanumeric(GROUP_LENGTH, chars: ALPHABET) }.join("-")
+  end
+
   # HMAC rather than bcrypt: the codes carry ~99 bits of entropy, so a slow hash adds nothing,
-  # and a deterministic digest lets a code be found and deleted in one statement.
-  def self.digest(code)
-    OpenSSL::HMAC.hexdigest("SHA256", key, normalize(code))
+  # and a deterministic digest lets a code be found and burnt in one statement.
+  # The purpose keys each kind of code separately.
+  def self.digest(code, purpose: :recovery_code)
+    OpenSSL::HMAC.hexdigest("SHA256", Rails.application.key_generator.generate_key(purpose.to_s, 32), normalize(code))
   end
 
   def self.normalize(code)
     code.to_s.downcase.gsub(/[^a-z0-9]/, "")
   end
-
-  def self.key
-    Rails.application.key_generator.generate_key("recovery_code", 32)
-  end
-  private_class_method :key
 
   def code=(code)
     self.digest = self.class.digest(code)

@@ -22,7 +22,7 @@
           <td class="py-2">
             <% unless user == Current.user %>
               <%= button_to t(".reset"), admin_user_passkey_reset_path(user),
-                form: { data: { turbo_confirm: t(".reset_confirm") } }, class: "underline cursor-pointer" %>
+                form: { data: { turbo: false, controller: "confirm", action: "confirm#ask", confirm_message_value: t(".reset_confirm") } }, class: "underline cursor-pointer" %>
             <% end %>
           </td>
         </tr>

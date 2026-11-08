@@ -2,21 +2,23 @@ class PasskeyRegistrationsController < ApplicationController
   allow_pending_passkey
   require_role :analyst, :admin
   before_action :require_registration_allowed
+  rate_limit to: 5, within: 3.minutes, only: :create,
+    by: -> { Current.user.id },
+    with: -> { flash.now[:alert] = t(".too_many_requests"); render :new, status: :too_many_requests },
+    store: Rails.configuration.x.rate_limit_store || cache_store
 
   def new
   end
 
   def options
-    options = Passkey.registration_options_for(Current.user)
-    session[:passkey_registration_challenge] = options.challenge
-    render json: options
+    render json: Current.session.passkey_registration_options!
   end
 
   def create
     @recovery_codes = Current.session.register_passkey!(
       credential: params[:credential].to_s,
-      challenge: session.delete(:passkey_registration_challenge),
-      nickname: params[:nickname].to_s
+      nickname: params[:nickname].to_s,
+      enrollment_code: params[:enrollment_code].to_s
     )
 
     if @recovery_codes.any?

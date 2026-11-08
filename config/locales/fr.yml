@@ -47,18 +47,21 @@ fr:
   admin:
     home:
       show:
+        title: "Administration"
         staff: "Équipe d’analyse"
         email: "Adresse e-mail"
         role: "Rôle"
         passkeys: "Passkeys"
         actions: "Actions"
         reset: "Réinitialiser les passkeys"
-        reset_confirm: "Supprimer ses passkeys et ses codes de secours, et le déconnecter partout ?"
+        reset_confirm: "Supprimer ses passkeys et ses codes de secours, et le déconnecter partout ? Un code d’enrôlement vous sera remis."
     passkey_resets:
       create:
-        done: "Passkeys et codes de secours supprimés. La personne en enregistrera une nouvelle à sa prochaine connexion."
+        title: "Code d’enrôlement"
+        body: "Les passkeys et les codes de secours de %{email} sont supprimés. Transmettez-lui ce code d’enrôlement par un autre canal que l’e-mail : il lui sera demandé pour enregistrer une nouvelle passkey."
+        once: "Ce code ne sera plus affiché. Il ne sert qu’une fois."
+        back: "Retour à l’administration"
         not_allowed: "Vous ne pouvez pas réinitialiser vos propres passkeys."
-        title: "Administration"
   roles:
     declarant: "Déclarant"
     analyst: "Analyste"
@@ -68,6 +71,8 @@ fr:
       title: "Enregistrer une passkey"
       body: "Votre rôle donne accès à des signalements : une passkey est exigée en plus du lien de connexion. Elle reste sur votre appareil (empreinte, visage ou code de déverrouillage)."
       nickname: "Nom de l’appareil"
+      enrollment_code: "Code d’enrôlement"
+      ask_for_enrollment_code: "Demandez un code d’enrôlement à un administrateur. Il vous sera demandé pour enregistrer votre première passkey."
       submit: "Enregistrer une passkey"
       browser_failed: "L’enregistrement n’a pas abouti. Réessayez, ou essayez un autre navigateur."
     create:
@@ -75,7 +80,8 @@ fr:
       body: "Si vous perdez votre passkey, chacun de ces codes permet une connexion, une seule fois. Notez-les maintenant en lieu sûr : ils ne seront plus jamais affichés."
       continue: "Continuer"
       done: "Passkey enregistrée."
-      failed: "La passkey n’a pas pu être vérifiée. Réessayez."
+      failed: "La passkey ou le code d’enrôlement n’a pas pu être vérifié. Réessayez."
+      too_many_requests: "Trop d’essais. Réessayez dans quelques minutes."
   passkey_sessions:
     new:
       title: "Vérifier avec ma passkey"
@@ -102,3 +108,5 @@ fr:
           attributes:
             role:
               too_few_admins: "ne peut pas changer : il doit rester au moins %{count} administrateurs"
+            base:
+              too_few_admins: "Suppression impossible : il doit rester au moins %{count} administrateurs."

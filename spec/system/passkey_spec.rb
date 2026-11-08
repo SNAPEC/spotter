@@ -4,6 +4,7 @@ require "capybara/rspec"
 RSpec.describe "Passkeys", type: :system do
   let(:origin) { URI(Rails.configuration.x.webauthn.origin) }
   let(:analyst) { User.create!(email: "analyste@example.com", role: "analyst") }
+  let(:admin) { User.create!(email: "admin@example.com", role: "admin") }
 
   before do
     driven_by :selenium, using: :headless_chrome, screen_size: [ 1280, 900 ]
@@ -27,11 +28,13 @@ RSpec.describe "Passkeys", type: :system do
     click_on "Se connecter"
   end
 
-  it "registers a passkey, then signs in with it" do
+  it "registers a passkey with an enrollment code, then signs in with it" do
+    code = analyst.issue_enrollment_code!(by: admin)
     visit "/analyst"
     sign_in(analyst)
 
     expect(page).to have_content("Enregistrer une passkey")
+    fill_in "Code d’enrôlement", with: code
     fill_in "Nom de l’appareil", with: "Ordinateur de test"
     click_on "Enregistrer une passkey"
 

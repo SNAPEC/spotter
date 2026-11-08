@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_08_160003) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_08_170002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,6 +45,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_160003) do
     t.bigint "user_id", null: false
     t.boolean "passkey_verified", default: false, null: false
     t.date "expires_on", null: false
+    t.string "webauthn_challenge"
     t.index ["expires_on"], name: "index_sessions_on_expires_on"
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
@@ -54,7 +55,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_160003) do
     t.string "role", default: "declarant", null: false
     t.date "membership_expires_on"
     t.integer "login_token_version", default: 0, null: false
+    t.string "enrollment_code_digest"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["enrollment_code_digest"], name: "index_users_on_enrollment_code_digest", unique: true
     t.check_constraint "role::text = ANY (ARRAY['declarant'::character varying, 'analyst'::character varying, 'admin'::character varying]::text[])", name: "users_role_check"
   end
 

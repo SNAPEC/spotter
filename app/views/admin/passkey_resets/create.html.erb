@@ -1,0 +1,10 @@
+<% content_for :title, t(".title") %>
+
+<div class="mx-auto w-full max-w-md">
+  <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
+  <p class="mt-4"><%= t(".body", email: @user.email) %></p>
+  <p class="mt-6 text-2xl font-mono"><code><%= @enrollment_code %></code></p>
+  <p class="mt-4"><%= t(".once") %></p>
+
+  <%= link_to t(".back"), admin_root_path, class: "mt-6 inline-block rounded px-4 py-2 bg-blue-700 text-white font-medium" %>
+</div>

@@ -153,6 +153,20 @@ RSpec.describe User, type: :model do
       expect(first.update(role: "analyst")).to be(true)
     end
 
+    it "refuses to destroy an admin when fewer than 2 admins would remain" do
+      first, _second = admin("admin1"), admin("admin2")
+
+      expect(first.destroy).to be(false)
+      expect(User.admin.count).to eq(2)
+      expect(first.errors[:base]).to be_present
+    end
+
+    it "lets an admin be destroyed when at least 2 others remain" do
+      first, _second, _third = admin("admin1"), admin("admin2"), admin("admin3")
+
+      expect(first.destroy).to be_truthy
+    end
+
     it "does not get in the way of other changes" do
       solo = admin("solo")
 
@@ -172,12 +186,12 @@ RSpec.describe User, type: :model do
     end
 
     it "deletes passkeys, recovery codes and sessions, and records who did it" do
-      expect { analyst.reset_passkeys!(by: admin) }.to change(AuditEvent, :count).by(1)
+      expect { analyst.reset_passkeys!(by: admin) }.to change(AuditEvent, :count).by(2)
 
       expect(analyst.passkeys.reload).to be_empty
       expect(analyst.recovery_codes.reload).to be_empty
       expect(analyst.sessions.reload).to be_empty
-      expect(AuditEvent.last).to have_attributes(actor: admin, action: "passkeys.reset", subject: analyst)
+      expect(AuditEvent.find_by(action: "passkeys.reset")).to have_attributes(actor: admin, subject: analyst)
     end
 
     it "refuses an admin resetting their own passkeys" do
@@ -188,11 +202,64 @@ RSpec.describe User, type: :model do
       expect(AuditEvent.count).to eq(0)
     end
 
+    it "refuses a user who is not staff, without auditing or signing them out" do
+      declarant = User.create!(email: "moniteur@example.com")
+      declarant.sessions.create!
+
+      expect { declarant.reset_passkeys!(by: admin) }.to raise_error(User::PasskeyResetNotAllowed)
+      expect(declarant.sessions.reload.size).to eq(1)
+      expect(AuditEvent.count).to eq(0)
+    end
+
+    it "issues an enrollment code and returns it" do
+      code = analyst.reset_passkeys!(by: admin)
+
+      expect(analyst.reload.enrollment_code_digest).to be_present
+      expect(analyst.enrollment_code_digest).not_to include(code.delete("-"))
+    end
+
     it "refuses a non-admin" do
       other = User.create!(email: "autre@example.com", role: "analyst")
 
       expect { analyst.reset_passkeys!(by: other) }.to raise_error(User::PasskeyResetNotAllowed)
       expect(analyst.passkeys.reload.size).to eq(1)
+    end
+  end
+
+  describe "#issue_enrollment_code!" do
+    let(:admin) { User.create!(email: "admin@example.com", role: "admin") }
+    let(:analyst) { User.create!(email: "analyste@example.com", role: "analyst") }
+
+    it "returns the code once, stores only a digest and records who issued it" do
+      code = nil
+
+      expect { code = analyst.issue_enrollment_code!(by: admin) }.to change(AuditEvent, :count).by(1)
+
+      expect(code).to match(/\A[a-z0-9]{5}(-[a-z0-9]{5}){3}\z/)
+      raw = User.connection.select_value("SELECT enrollment_code_digest FROM users WHERE id = #{analyst.id}")
+      expect(raw).to be_present
+      expect(raw).not_to include(code.delete("-"))
+      expect(AuditEvent.last).to have_attributes(actor: admin, action: "enrollment_code.issued", subject: analyst)
+    end
+
+    it "replaces the previous code" do
+      old_code = analyst.issue_enrollment_code!(by: admin)
+      new_code = analyst.issue_enrollment_code!(by: admin)
+
+      expect(analyst.enrollment_code_digest).to eq(RecoveryCode.digest(new_code, purpose: :enrollment_code))
+      expect(analyst.enrollment_code_digest).not_to eq(RecoveryCode.digest(old_code, purpose: :enrollment_code))
+    end
+
+    it "lets an admin bootstrap their own enrollment from the console" do
+      expect { admin.issue_enrollment_code!(by: admin) }.not_to raise_error
+    end
+
+    it "refuses a non-admin issuer and a non-staff user" do
+      declarant = User.create!(email: "moniteur@example.com")
+
+      expect { analyst.issue_enrollment_code!(by: User.create!(email: "autre@example.com", role: "analyst")) }
+        .to raise_error(User::EnrollmentNotAllowed)
+      expect { declarant.issue_enrollment_code!(by: admin) }.to raise_error(User::EnrollmentNotAllowed)
     end
   end
 end

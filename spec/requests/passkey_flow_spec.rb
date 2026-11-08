@@ -5,15 +5,21 @@ RSpec.describe "Passkey flow", type: :request do
   let(:client) { WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin) }
   let(:analyst) { User.create!(email: "analyste@example.com", role: "analyst") }
   let(:admin) { User.create!(email: "admin@example.com", role: "admin") }
+  let(:issuer) { User.create!(email: "emetteur@example.com", role: "admin") }
 
   def sign_in(user)
     post magic_link_path(user.reload.magic_link_token)
   end
 
-  def register_passkey(nickname: "Ordinateur")
+  def register_passkey(nickname: "Ordinateur", enrollment_code: nil, authenticator: client)
     post options_passkey_registration_path, as: :json
     challenge = response.parsed_body.fetch("challenge")
-    post passkey_registration_path, params: { credential: client.create(challenge: challenge, user_verified: true).to_json, nickname: nickname }
+    credential = authenticator.create(challenge: challenge, user_verified: true).to_json
+    post passkey_registration_path, params: { credential: credential, nickname: nickname, enrollment_code: enrollment_code }.compact
+  end
+
+  def register_first_passkey(user, **options)
+    register_passkey(enrollment_code: user.issue_enrollment_code!(by: issuer), **options)
   end
 
   def verify_passkey
@@ -30,7 +36,7 @@ RSpec.describe "Passkey flow", type: :request do
 
   def enrol(user)
     sign_in(user)
-    register_passkey
+    register_first_passkey(user)
     delete session_path
   end
 
@@ -47,7 +53,7 @@ RSpec.describe "Passkey flow", type: :request do
       get "/"
       expect(response).to redirect_to(new_passkey_registration_path)
 
-      register_passkey
+      register_first_passkey(analyst)
 
       expect(response).to have_http_status(:ok)
       expect(analyst.passkeys.sole.nickname).to eq("Ordinateur")
@@ -57,7 +63,7 @@ RSpec.describe "Passkey flow", type: :request do
 
     it "shows the 10 recovery codes once, without caching, and stores only their digests" do
       sign_in(analyst)
-      register_passkey
+      register_first_passkey(analyst)
 
       codes = response.body.scan(/\b[a-z0-9]{5}(?:-[a-z0-9]{5}){3}\b/).uniq
       expect(codes.size).to eq(10)
@@ -66,13 +72,15 @@ RSpec.describe "Passkey flow", type: :request do
       expect(analyst.use_recovery_code!(codes.first)).to be(true)
     end
 
-    it "keeps the session pending when the attestation does not verify" do
+    it "keeps the session pending, and the enrollment code valid, when the attestation does not verify" do
+      code = analyst.issue_enrollment_code!(by: issuer)
       sign_in(analyst)
       post options_passkey_registration_path, as: :json
-      post passkey_registration_path, params: { credential: client.create(challenge: "d3Jvbmc", user_verified: true).to_json }
+      post passkey_registration_path, params: { credential: client.create(challenge: "d3Jvbmc", user_verified: true).to_json, enrollment_code: code }
 
       expect(response).to redirect_to(new_passkey_registration_path)
       expect(analyst.passkeys).to be_empty
+      expect(analyst.reload.enrollment_code_digest).to be_present
       get "/analyst"
       expect(response).to redirect_to(new_passkey_registration_path)
     end
@@ -81,13 +89,74 @@ RSpec.describe "Passkey flow", type: :request do
       sign_in(analyst)
       post options_passkey_registration_path, as: :json
       challenge = response.parsed_body.fetch("challenge")
-      post passkey_registration_path, params: { credential: client.create(challenge: challenge, user_verified: true).to_json }
+      code = analyst.issue_enrollment_code!(by: issuer)
+      post passkey_registration_path, params: { credential: client.create(challenge: challenge, user_verified: true).to_json, enrollment_code: code }
 
       other_authenticator = WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin)
       post passkey_registration_path, params: { credential: other_authenticator.create(challenge: challenge, user_verified: true).to_json }
 
       expect(response).to redirect_to(new_passkey_registration_path)
       expect(analyst.passkeys.count).to eq(1)
+    end
+  end
+
+  describe "enrollment code" do
+    it "tells a staff member without a code to ask an admin" do
+      sign_in(analyst)
+
+      get new_passkey_registration_path
+
+      expect(response.body).to include("Demandez un code d’enrôlement à un administrateur")
+      expect(response.body).not_to include(%(name="credential"))
+    end
+
+    it "asks for the code together with the passkey when one was issued" do
+      analyst.issue_enrollment_code!(by: issuer)
+      sign_in(analyst)
+
+      get new_passkey_registration_path
+
+      expect(response.body).to include(%(name="enrollment_code"))
+    end
+
+    it "refuses a registration without the code or with a wrong one, and keeps the session pending" do
+      analyst.issue_enrollment_code!(by: issuer)
+      sign_in(analyst)
+
+      register_passkey
+      expect(response).to redirect_to(new_passkey_registration_path)
+      register_passkey(enrollment_code: "aaaaa-bbbbb-ccccc-ddddd")
+      expect(response).to redirect_to(new_passkey_registration_path)
+
+      expect(analyst.passkeys).to be_empty
+      get "/analyst"
+      expect(response).to redirect_to(new_passkey_registration_path)
+    end
+
+    it "works once" do
+      code = analyst.issue_enrollment_code!(by: issuer)
+      sign_in(analyst)
+      register_passkey(enrollment_code: code)
+      expect(analyst.passkeys.count).to eq(1)
+      expect(analyst.reload.enrollment_code_digest).to be_nil
+
+      analyst.passkeys.delete_all
+      delete session_path
+      sign_in(analyst)
+      register_passkey(enrollment_code: code, authenticator: WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin))
+
+      expect(response).to redirect_to(new_passkey_registration_path)
+      expect(analyst.passkeys).to be_empty
+    end
+
+    it "limits the attempts per user" do
+      analyst.issue_enrollment_code!(by: issuer)
+      sign_in(analyst)
+
+      5.times { register_passkey(enrollment_code: "aaaaa-bbbbb-ccccc-ddddd") }
+      register_passkey(enrollment_code: "aaaaa-bbbbb-ccccc-ddddd")
+
+      expect(response).to have_http_status(:too_many_requests)
     end
   end
 
@@ -155,12 +224,34 @@ RSpec.describe "Passkey flow", type: :request do
       expect(response).to redirect_to(new_passkey_session_path)
     end
 
-    it "lets a pending staff member sign out" do
+    it "lets a pending staff member sign out of this session, not everywhere" do
+      verified = analyst.sessions.create!(passkey_verified: true)
       sign_in(analyst)
 
+      delete sessions_path
+      expect(response).to redirect_to(new_passkey_session_path)
+      expect(Session.exists?(verified.id)).to be(true)
+
+      delete session_path
+      expect(response).to redirect_to(login_path)
+    end
+
+    it "does not verify a later session with a replayed assertion and an old session cookie" do
+      sign_in(analyst)
+      post options_passkey_session_path, as: :json
+      old_rails_session = cookies["_spotter_session"]
+      challenge, allowed = response.parsed_body.values_at("challenge", "allowCredentials")
+      assertion = client.get(challenge: challenge, user_verified: true, sign_count: 0, allow_credentials: allowed.pluck("id")).to_json
+      post passkey_session_path, params: { credential: assertion }
       delete session_path
 
-      expect(response).to redirect_to(login_path)
+      sign_in(analyst)
+      cookies["_spotter_session"] = old_rails_session
+      post passkey_session_path, params: { credential: assertion }
+
+      expect(response).to redirect_to(new_passkey_session_path)
+      get "/analyst"
+      expect(response).to redirect_to(new_passkey_session_path)
     end
   end
 
@@ -179,19 +270,26 @@ RSpec.describe "Passkey flow", type: :request do
 
   describe "admin reset" do
     before do
-      User.create!(email: "admin2@example.com", role: "admin")
       enrol(analyst)
       enrol(admin)
     end
 
-    it "deletes the analyst's passkeys and records it" do
+    it "deletes the analyst's passkeys, records it and shows a fresh enrollment code once" do
       sign_in_with_passkey(admin)
 
-      expect { post admin_user_passkey_reset_path(analyst) }.to change(AuditEvent, :count).by(1)
+      expect { post admin_user_passkey_reset_path(analyst) }.to change(AuditEvent, :count).by(2)
 
-      expect(response).to redirect_to(admin_root_path)
+      expect(response).to have_http_status(:ok)
+      expect(response.headers["Cache-Control"]).to include("no-store")
+      code = response.body[/\b[a-z0-9]{5}(?:-[a-z0-9]{5}){3}\b/]
+      expect(code).to be_present
       expect(analyst.passkeys.reload).to be_empty
-      expect(AuditEvent.last).to have_attributes(actor: admin, action: "passkeys.reset", subject: analyst)
+      expect(AuditEvent.where(subject: analyst).order(:id).last(2).map(&:action)).to eq(%w[passkeys.reset enrollment_code.issued])
+
+      delete session_path
+      sign_in(analyst)
+      register_passkey(enrollment_code: code, authenticator: WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin))
+      expect(analyst.passkeys.count).to eq(1)
     end
 
     it "refuses an admin resetting their own passkeys" do
@@ -220,6 +318,7 @@ RSpec.describe "Passkey flow", type: :request do
 
       get admin_root_path
 
+      expect(response.body).to include("<h1", "Administration</h1>")
       expect(response.body).to include("analyste@example.com")
       expect(response.body).to include(admin_user_passkey_reset_path(analyst))
       expect(response.body).not_to include(admin_user_passkey_reset_path(admin))
