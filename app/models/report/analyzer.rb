@@ -39,6 +39,9 @@ class Report::Analyzer
       report.ready_for_validation!
       analysis
     end
+  rescue Llm::UnconfiguredExtractor::NotConfigured
+    # No point in trying again: the analyst codes the report by hand right away.
+    record_failure(report, revision: revision)
   end
 
   # When the extractor fails for good, the analyst codes the report by hand: a failed analysis takes
@@ -74,6 +77,8 @@ class Report::Analyzer
     # not reach the failed jobs table nor Sentry, so it is replaced, cause included.
     def extract(report, fields)
       @extractor.extract(text: text_of(report), schema: schema_for(fields))
+    rescue Llm::UnconfiguredExtractor::NotConfigured
+      raise
     rescue StandardError
       raise ExtractionFailed, "extractor failed", cause: nil
     end
