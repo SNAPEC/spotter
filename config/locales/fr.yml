@@ -227,7 +227,7 @@ fr:
         report:
           attributes:
             casualties:
-              too_many: "ne peuvent pas être plus de %{count} par signalement"
+              too_many: "ne peuvent pas être plus de %{count} par RETEX"
         narrative:
           attributes:
             free_text_answers:

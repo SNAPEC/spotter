@@ -78,7 +78,7 @@ RSpec.describe Report, "submission rules, casualties limit and predicates", type
 
     it "refuses a fourth, with a French message, and stores none of them" do
       expect { report.save_draft!(casualties_attributes: casualties(4)) }
-        .to raise_error(ActiveRecord::RecordInvalid, /Les personnes blessées ne peuvent pas être plus de 3 par signalement/)
+        .to raise_error(ActiveRecord::RecordInvalid, /Les personnes blessées ne peuvent pas être plus de 3 par RETEX/)
 
       expect(report.reload.casualties).to be_empty
     end
