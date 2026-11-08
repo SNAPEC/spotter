@@ -3,7 +3,7 @@ class Analysis < ApplicationRecord
   include ReadOnlyOnceDecided
 
   STATUSES = %w[proposed reviewed failed].freeze
-  PROVIDERS = %w[fake scaleway].freeze
+  PROVIDERS = %w[fake none scaleway].freeze
 
   belongs_to :report
 

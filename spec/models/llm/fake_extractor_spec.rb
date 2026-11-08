@@ -14,8 +14,10 @@ RSpec.describe Llm::FakeExtractor do
   end
   let(:text) { "Chute fictive au deuxième point. Le reste de la séance s'est bien passé." }
 
-  it "is the configured extractor outside production, with no network" do
+  it "is the configured extractor in test and development, with no network, and never in production" do
     expect(Rails.configuration.x.llm_extractor).to be_a(described_class)
+    expect(Rails.application.config_for(:external_services, env: "development")[:llm_extractor]).to eq("Llm::FakeExtractor")
+    expect(Rails.application.config_for(:external_services, env: "production")[:llm_extractor]).to eq("Llm::UnconfiguredExtractor")
   end
 
   it "names its provider, model and prompt version" do

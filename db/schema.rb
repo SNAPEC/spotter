@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_205001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_210001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -35,7 +35,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_205001) do
     t.text "modifications", null: false
     t.index ["report_id", "prompt_version"], name: "index_analyses_on_report_id_and_prompt_version", unique: true
     t.index ["report_id"], name: "index_analyses_on_report_id"
-    t.check_constraint "provider::text = ANY (ARRAY['fake'::character varying::text, 'scaleway'::character varying::text])", name: "analyses_provider_check"
+    t.check_constraint "provider::text = ANY (ARRAY['fake'::character varying::text, 'none'::character varying::text, 'scaleway'::character varying::text])", name: "analyses_provider_check"
     t.check_constraint "status::text = ANY (ARRAY['proposed'::character varying::text, 'reviewed'::character varying::text, 'failed'::character varying::text])", name: "analyses_status_check"
   end
 

@@ -10,9 +10,8 @@ test:
   <<: *default
 
 production:
-  # The LLM double stays in production until the Scaleway extractor exists: its proposals are only
-  # suggestions, and an analyst validates every report.
-  llm_extractor: Llm::FakeExtractor
+  # Never the double here either: until the Scaleway extractor exists, every report is coded by hand.
+  llm_extractor: Llm::UnconfiguredExtractor
   # Never the double here: it says everyone is a member. The base class refuses every check until the
   # SNAPEC membership API client exists.
   membership_verifier: Membership::Verifier
