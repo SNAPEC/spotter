@@ -114,7 +114,7 @@ RSpec.describe User, type: :model do
     it "reuses the account of a known email" do
       user
 
-      expect { User.send_magic_link("LEA.MARTIN@example.com") }.not_to change(User, :count)
+      expect { expect(User.send_magic_link("LEA.MARTIN@example.com")).to eq(user) }.not_to change(User, :count)
     end
 
     it "sends nothing for a malformed email" do

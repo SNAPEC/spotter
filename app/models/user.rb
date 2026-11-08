@@ -16,7 +16,7 @@ class User < ApplicationRecord
 
   # Unknown emails get a declarant account so the answer never reveals who is registered.
   def self.send_magic_link(email)
-    find_or_create_by(email: email).tap do |user|
+    create_or_find_by(email: email).tap do |user|
       MagicLinkMailer.with(user: user).sign_in.deliver_later if user.persisted?
     end
   end
