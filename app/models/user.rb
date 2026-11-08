@@ -1,7 +1,12 @@
 class User < ApplicationRecord
   ROLES = %w[declarant analyst admin].freeze
+  MINIMUM_ADMINS = 2
+
+  class PasskeyResetNotAllowed < StandardError; end
 
   has_many :sessions, dependent: :destroy
+  has_many :passkeys, dependent: :delete_all
+  has_many :recovery_codes, dependent: :delete_all
 
   enum :role, ROLES.index_with(&:itself), default: "declarant", validate: true
 
@@ -9,6 +14,7 @@ class User < ApplicationRecord
   normalizes :email, with: ->(email) { email.strip }
 
   validates :email, presence: true, format: { with: URI::MailTo::EMAIL_REGEXP }
+  validate :keeps_enough_admins, if: -> { will_save_change_to_role?(from: "admin") }
 
   generates_token_for :magic_link, expires_in: 15.minutes do
     login_token_version
@@ -45,6 +51,35 @@ class User < ApplicationRecord
     end
   end
 
+  # Returns the codes in clear: this is the only time they exist outside the user's hands.
+  def generate_recovery_codes!
+    RecoveryCode.generate.tap do |codes|
+      transaction do
+        recovery_codes.delete_all
+        codes.each { |code| recovery_codes.create!(code: code) }
+      end
+    end
+  end
+
+  # A single DELETE both checks and burns the code, so it cannot be used twice concurrently.
+  def use_recovery_code!(code)
+    return false if RecoveryCode.normalize(code).empty?
+
+    recovery_codes.where(digest: RecoveryCode.digest(code)).delete_all == 1
+  end
+
+  # Signing out everywhere too: whoever held the lost passkey may hold a verified session.
+  def reset_passkeys!(by:)
+    raise PasskeyResetNotAllowed unless by.admin? && by != self
+
+    transaction do
+      passkeys.delete_all
+      recovery_codes.delete_all
+      sign_out_everywhere!
+      AuditEvent.record!(actor: by, action: "passkeys.reset", subject: self)
+    end
+  end
+
   def staff?
     analyst? || admin?
   end
@@ -52,4 +87,11 @@ class User < ApplicationRecord
   def member?
     membership_expires_on.present? && membership_expires_on >= Date.current
   end
+
+  private
+    # Row locks make two concurrent demotions wait for each other instead of both passing.
+    def keeps_enough_admins
+      remaining = User.admin.where.not(id: id).lock.pluck(:id).size
+      errors.add(:role, :too_few_admins, count: MINIMUM_ADMINS) if remaining < MINIMUM_ADMINS
+    end
 end

@@ -49,6 +49,10 @@ Rails.application.configure do
   config.active_record.encryption.deterministic_key = "development-deterministic-key-not-secret"
   config.active_record.encryption.key_derivation_salt = "development-key-derivation-salt-not-secret"
 
+  # Passkeys are bound to the exact origin the browser shows.
+  config.x.webauthn.origin = "http://localhost:3000"
+  config.x.webauthn.rp_id = "localhost"
+
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
 

@@ -30,6 +30,10 @@ Rails.application.configure do
   config.active_record.encryption.deterministic_key = "test-deterministic-key-not-secret"
   config.active_record.encryption.key_derivation_salt = "test-key-derivation-salt-not-secret"
 
+  # The system specs serve the app on this port; WebAuthn refuses an IP address as relying party.
+  config.x.webauthn.origin = "http://localhost:3044"
+  config.x.webauthn.rp_id = "localhost"
+
   # Render exception templates for rescuable exceptions and raise for other exceptions.
   config.action_dispatch.show_exceptions = :rescuable
 

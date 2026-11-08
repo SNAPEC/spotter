@@ -133,4 +133,66 @@ RSpec.describe User, type: :model do
       assert_no_enqueued_emails { expect(User.send_magic_link("nope")).not_to be_persisted }
     end
   end
+
+  describe "admin count" do
+    def admin(name) = User.create!(email: "#{name}@example.com", role: "admin")
+
+    it "refuses to demote an admin when fewer than 2 admins would remain" do
+      first, _second = admin("admin1"), admin("admin2")
+
+      first.role = "analyst"
+
+      expect(first).not_to be_valid
+      expect(first.errors[:role]).to be_present
+      expect { first.save }.not_to change { User.admin.count }
+    end
+
+    it "lets an admin go when at least 2 others remain" do
+      first, _second, _third = admin("admin1"), admin("admin2"), admin("admin3")
+
+      expect(first.update(role: "analyst")).to be(true)
+    end
+
+    it "does not get in the way of other changes" do
+      solo = admin("solo")
+
+      expect(solo.update(membership_expires_on: Date.current)).to be(true)
+      expect(user.update(role: "analyst")).to be(true)
+    end
+  end
+
+  describe "#reset_passkeys!" do
+    let(:admin) { User.create!(email: "admin@example.com", role: "admin") }
+    let(:analyst) { User.create!(email: "analyste@example.com", role: "analyst") }
+
+    before do
+      analyst.passkeys.create!(external_id: "credential-1", public_key: "key", sign_count: 0)
+      analyst.generate_recovery_codes!
+      analyst.sessions.create!(passkey_verified: true)
+    end
+
+    it "deletes passkeys, recovery codes and sessions, and records who did it" do
+      expect { analyst.reset_passkeys!(by: admin) }.to change(AuditEvent, :count).by(1)
+
+      expect(analyst.passkeys.reload).to be_empty
+      expect(analyst.recovery_codes.reload).to be_empty
+      expect(analyst.sessions.reload).to be_empty
+      expect(AuditEvent.last).to have_attributes(actor: admin, action: "passkeys.reset", subject: analyst)
+    end
+
+    it "refuses an admin resetting their own passkeys" do
+      admin.passkeys.create!(external_id: "credential-2", public_key: "key", sign_count: 0)
+
+      expect { admin.reset_passkeys!(by: admin) }.to raise_error(User::PasskeyResetNotAllowed)
+      expect(admin.passkeys.reload.size).to eq(1)
+      expect(AuditEvent.count).to eq(0)
+    end
+
+    it "refuses a non-admin" do
+      other = User.create!(email: "autre@example.com", role: "analyst")
+
+      expect { analyst.reset_passkeys!(by: other) }.to raise_error(User::PasskeyResetNotAllowed)
+      expect(analyst.passkeys.reload.size).to eq(1)
+    end
+  end
 end
