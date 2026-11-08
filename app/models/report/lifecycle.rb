@@ -32,7 +32,7 @@ module Report::Lifecycle
     raise
   end
 
-  # The declarant may correct a submitted report until staff take it in charge. The analyses go: their
+  # The declarant may correct a submitted report until staff take it in charge, for OWNERSHIP_DAYS at most. The analyses go: their
   # excerpts quote the old text. The new revision makes a run still working on the old text write
   # nothing. Ownership cutoff, tracking code and submission month stay as submit! set them.
   # Authorisation comes before any state check, so a stranger learns nothing about the report.
@@ -43,6 +43,7 @@ module Report::Lifecycle
       raise Report::NotAllowed, "not the declarant of this report" unless declarant?(user: user, tracking_code: tracking_code)
       raise Report::InvalidTransition, "cannot edit a #{status} report" unless under_analysis?
       raise Report::InvalidTransition, "already taken in charge" if taken_in_charge?
+      raise Report::InvalidTransition, "editing window closed" unless editable_until && editable_until >= Date.current
 
       assign_attributes(attrs)
       # A form sent back unchanged keeps its analysis rather than queue a new one for the same text.
@@ -73,6 +74,7 @@ module Report::Lifecycle
         update!(
           status: "submitted",
           submitted_on: Date.current.beginning_of_month,
+          editable_until: Date.current + OWNERSHIP_DAYS,
           draft_expires_on: nil,
           draft_token_digest: nil,
           tracking_code_digest: code && Report.digest(RecoveryCode.normalize(code), purpose: :tracking_code)
@@ -111,6 +113,12 @@ module Report::Lifecycle
   end
 
   private
+    # editable_until gives away the exact submission day: it goes as soon as editing closes.
+    def close_editing
+      self.taken_in_charge = true
+      self.editable_until = nil
+    end
+
     def through_lifecycle
       @lifecycle_transition = true
       yield
@@ -150,7 +158,7 @@ module Report::Lifecycle
 
       transition!(from: from, to: to) do
         AccessLog.record!(user: analyst, report: self, action: action)
-        self.taken_in_charge = true
+        close_editing
         purge_after_decision!
       end
     end

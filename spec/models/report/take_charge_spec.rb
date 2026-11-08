@@ -24,6 +24,7 @@ RSpec.describe Report, "taking in charge", type: :model do
       report.take_charge!(User.create!(email: "marc.petit@example.com", role: "admin"))
 
       expect(report.reload).to be_taken_in_charge
+      expect(report.editable_until).to be_nil
       expect(take_charge_logs.pluck(:user_id)).to eq([ analyst.id ])
       expect(report).to be_submitted
     end
@@ -59,9 +60,11 @@ RSpec.describe Report, "taking in charge", type: :model do
 
   describe "other staff actions" do
     it "take the report in charge with a question" do
+      expect(report.editable_until).to be_present
       report.ask_clarification!(analyst, "Question fictive ?")
 
       expect(report.reload).to be_taken_in_charge
+      expect(report.editable_until).to be_nil
       expect(take_charge_logs).to be_empty
     end
 
@@ -71,6 +74,7 @@ RSpec.describe Report, "taking in charge", type: :model do
         report.public_send(decision, analyst)
 
         expect(report.reload).to be_taken_in_charge
+        expect(report.editable_until).to be_nil
       end
     end
   end
