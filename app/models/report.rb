@@ -18,6 +18,7 @@ class Report < ApplicationRecord
   has_one :narrative, dependent: :destroy
   has_many :casualties, dependent: :destroy
   has_one :report_ownership, dependent: :destroy
+  has_many :analyses, dependent: :destroy
 
   accepts_nested_attributes_for :narrative, update_only: true
   accepts_nested_attributes_for :casualties, allow_destroy: true
