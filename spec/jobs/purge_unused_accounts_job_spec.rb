@@ -83,7 +83,7 @@ RSpec.describe PurgeUnusedAccountsJob, type: :job do
   it "keeps an ex-staff member demoted to declarant, whom logs and audit events point to" do
     admin = User.create!(email: "admin@example.test", role: "admin")
     logged, reset = %w[journal audit].map { |name| User.create!(email: "#{name}@example.test", role: "analyst") }
-    AccessLog.record!(user: logged, report: Struct.new(:id).new(SecureRandom.uuid), action: "view")
+    AccessLog.record!(user: logged, report: Struct.new(:id).new(SecureRandom.uuid), action: "take_charge")
     reset.issue_enrollment_code!(by: admin)
     [ logged, reset ].each { |user| user.update!(role: "declarant"); make_due(user) }
 

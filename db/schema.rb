@@ -47,7 +47,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_210005) do
     t.datetime "created_at", null: false
     t.index ["actor_id"], name: "index_audit_events_on_actor_id"
     t.index ["subject_type", "subject_id"], name: "index_audit_events_on_subject"
-    t.check_constraint "action::text = ANY (ARRAY['passkeys.reset'::character varying, 'enrollment_code.issued'::character varying, 'user.deactivated'::character varying]::text[])", name: "audit_events_action_check"
+    t.check_constraint "action::text = ANY (ARRAY['passkeys.reset'::character varying, 'enrollment_code.issued'::character varying, 'user.deactivated'::character varying, 'passkey.enrolled_after_recovery'::character varying]::text[])", name: "audit_events_action_check"
   end
 
   create_table "casualties", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
