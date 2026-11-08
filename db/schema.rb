@@ -10,9 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_100004) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_110002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "analyses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "report_id", null: false
+    t.string "provider", null: false
+    t.string "model", null: false
+    t.string "prompt_version", null: false
+    t.string "status", default: "proposed", null: false
+    t.jsonb "proposals", default: {}, null: false
+    t.jsonb "modifications", default: {}, null: false
+    t.jsonb "decisions", default: {}, null: false
+    t.index ["report_id", "prompt_version"], name: "index_analyses_on_report_id_and_prompt_version", unique: true
+    t.index ["report_id"], name: "index_analyses_on_report_id"
+    t.check_constraint "provider::text = ANY (ARRAY['fake'::character varying::text, 'scaleway'::character varying::text])", name: "analyses_provider_check"
+    t.check_constraint "status::text = ANY (ARRAY['proposed'::character varying::text, 'reviewed'::character varying::text, 'failed'::character varying::text])", name: "analyses_status_check"
+  end
 
   create_table "audit_events", force: :cascade do |t|
     t.bigint "actor_id", null: false
@@ -29,6 +44,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100004) do
     t.string "severity"
     t.jsonb "answers", default: {}, null: false
     t.index ["report_id"], name: "index_casualties_on_report_id"
+  end
+
+  create_table "clarifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "report_id", null: false
+    t.string "author", null: false
+    t.text "body", null: false
+    t.integer "position", null: false
+    t.index ["report_id", "position"], name: "index_clarifications_on_report_id_and_position", unique: true
+    t.check_constraint "author::text = ANY (ARRAY['analyst'::character varying::text, 'declarant'::character varying::text])", name: "clarifications_author_check"
   end
 
   create_table "narratives", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -144,8 +168,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100004) do
     t.check_constraint "role::text = ANY (ARRAY['declarant'::character varying::text, 'analyst'::character varying::text, 'admin'::character varying::text])", name: "users_role_check"
   end
 
+  add_foreign_key "analyses", "reports"
   add_foreign_key "audit_events", "users", column: "actor_id"
   add_foreign_key "casualties", "reports"
+  add_foreign_key "clarifications", "reports"
   add_foreign_key "narratives", "reports"
   add_foreign_key "passkeys", "users"
   add_foreign_key "recovery_codes", "users"

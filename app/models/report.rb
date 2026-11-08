@@ -18,6 +18,8 @@ class Report < ApplicationRecord
   has_one :narrative, dependent: :destroy
   has_many :casualties, dependent: :destroy
   has_one :report_ownership, dependent: :destroy
+  has_many :analyses, dependent: :destroy
+  has_many :clarifications, -> { order(:position) }, dependent: :destroy
 
   accepts_nested_attributes_for :narrative, update_only: true
   accepts_nested_attributes_for :casualties, allow_destroy: true
@@ -28,6 +30,7 @@ class Report < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :event_type, inclusion: { in: EVENT_TYPES }, allow_nil: true
   validate :taxonomy_codes_are_options, :answers_fit_taxonomy, if: :taxonomy_version
+  validate :no_free_text_once_decided, if: -> { taxonomy_version && will_save_change_to_answers? }
 
   scope :expired_drafts, -> { where(status: "draft", draft_expires_on: ...Date.current) }
 
@@ -63,9 +66,8 @@ class Report < ApplicationRecord
     find_by(tracking_code_digest: digest(normalized, purpose: :tracking_code))
   end
 
-  # An overdue link is ignored even before CutOwnershipsJob deletes it.
   def self.owned_by(user)
-    where(id: ReportOwnership.of(user).where(cutoff_on: Date.current.next_day..).select(:report_id))
+    where(id: ReportOwnership.of(user).live.select(:report_id))
   end
 
   # HMAC rather than a slow hash: tokens and codes are random with high entropy, and a deterministic
@@ -97,12 +99,56 @@ class Report < ApplicationRecord
     draft? && draft_expires_on < Date.current
   end
 
+  # The declarant is told by mail, after the commit, when the report still has a live ownership.
+  def ask_clarification!(analyst, body)
+    raise Report::NotAllowed, "only staff ask for clarification" unless analyst&.staff?
+
+    with_lock do
+      raise Report::InvalidTransition, "a question is already pending" if awaiting_clarification?
+
+      add_clarification!("analyst", body).tap do
+        ActiveRecord.after_all_transactions_commit { ClarificationMailer.requested(self).deliver_later }
+      end
+    end
+  end
+
+  def answer_clarification!(body)
+    with_lock do
+      raise Report::InvalidTransition, "no pending question" unless awaiting_clarification?
+
+      add_clarification!("declarant", body)
+    end
+  end
+
+  def awaiting_clarification?
+    clarifications.reorder(position: :desc).pick(:author) == "analyst"
+  end
+
   # The draft stays open through its expiry day: the link goes the day after, with the draft itself.
   def draft_cutoff_on
     draft_expires_on + 1
   end
 
   private
+    # Called under the row lock, which also makes the position sequential.
+    def add_clarification!(author, body)
+      raise Report::InvalidTransition, "cannot exchange on a #{status} report" unless under_analysis?
+
+      clarifications.create!(author: author, body: body, position: clarifications.maximum(:position).to_i + 1)
+    end
+
+    def free_text_codes
+      taxonomy_version.fields.where(kind: "text").pluck(:code)
+    end
+
+    # Checked against the stored status, like Narrative: the purge removed them, a stale copy must not
+    # bring them back.
+    def no_free_text_once_decided
+      return unless persisted? && Report.decided.exists?(id)
+
+      errors.add(:answers, :invalid) if answers.is_a?(Hash) && answers.keys.intersect?(free_text_codes)
+    end
+
     def taxonomy_codes_are_options
       TAXONOMY_COLUMNS.each do |column|
         value = self[column]

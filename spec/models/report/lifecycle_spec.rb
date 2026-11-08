@@ -27,8 +27,7 @@ RSpec.describe Report::Lifecycle, type: :model do
   def in_validation(mode: "confidential")
     draft(mode: mode).tap do |report|
       report.submit!
-      report.start_analysis!
-      report.ready_for_validation!
+      Report::Analyzer.new.call(report)
     end
   end
 
@@ -133,6 +132,21 @@ RSpec.describe Report::Lifecycle, type: :model do
       end
     end
 
+    %i[validate! reject!].each do |decision|
+      it "refuses free-text answers written back after #{decision}" do
+        report = in_validation
+        report.public_send(decision, analyst)
+
+        stale = Report.find(report.id)
+        expect { stale.update!(answers: stale.answers.merge("material_damage" => "Texte fictif réinjecté")) }
+          .to raise_error(ActiveRecord::RecordInvalid)
+        expect { report.casualties.sole.update!(answers: { "injury_detail" => "Détail fictif réinjecté" }) }
+          .to raise_error(ActiveRecord::RecordInvalid)
+        expect(Report.find(report.id).answers).not_to have_key("material_damage")
+        expect(Casualty.where(report_id: report.id).sole.answers).not_to have_key("injury_detail")
+      end
+    end
+
     it "refuses a status change outside the lifecycle" do
       report = in_validation
 
@@ -151,6 +165,10 @@ RSpec.describe Report::Lifecycle, type: :model do
           report = in_validation(mode: mode)
           report.update_column(:draft_token_digest, "leftover")
           narrative_id = report.narrative.id
+          report.analyses.sole.update!(modifications: { "anonymized_text" => "Récit fictif retouché." })
+          expect(report.analyses.sole.proposals.to_s).to include("Récit fictif.")
+          report.ask_clarification!(analyst, "Question fictive ?")
+          report.answer_clarification!("Réponse fictive.")
 
           report.public_send(decision, analyst)
 
@@ -164,6 +182,10 @@ RSpec.describe Report::Lifecycle, type: :model do
           expect(Report.find(report.id).answers).to eq("weather" => "good", "clients_count" => 4)
           expect(report.casualties.sole.reload.answers).to eq("age_range" => "over_60")
           expect(report.casualties.sole.severity).to eq("minor")
+          expect(Clarification.where(report_id: report.id)).to be_empty
+          expect(Analysis.where(report_id: report.id).pluck(:modifications)).to eq([ {} ])
+          expect(Analysis.where(report_id: report.id).pick(Arel.sql("proposals::text"))).not_to include("excerpt", "Récit fictif")
+          expect(Analysis.where(report_id: report.id).sole.proposals).to include("weather" => { "value" => be_present })
         end
       end
     end
