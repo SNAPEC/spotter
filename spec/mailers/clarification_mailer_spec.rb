@@ -81,4 +81,33 @@ RSpec.describe ClarificationMailer, type: :mailer do
     expect(written).to include("ClarificationMailer")
     expect(written).not_to include("lea.martin")
   end
+
+  describe "delivery failure" do
+    failing_smtp = Class.new do
+      def initialize(_settings); end
+
+      def deliver!(mail)
+        raise Net::SMTPFatalError.new(Net::SMTP::Response.parse("550 5.1.1 <#{mail.to.first}>: unknown recipient"))
+      end
+    end
+
+    around do |example|
+      ActionMailer::Base.add_delivery_method(:failing_smtp, failing_smtp)
+      described_class.delivery_method = :failing_smtp
+      example.run
+    ensure
+      described_class.delivery_method = ActionMailer::Base.delivery_method
+    end
+
+    it "raises an error that names neither the address nor the user" do
+      report = submitted("confidential")
+      travel_to(Date.new(2026, 11, 20)) { report.ask_clarification!(analyst, question) }
+
+      expect { perform_enqueued_jobs }.to raise_error(ClarificationMailer::DeliveryFailed) { |error|
+        expect(error.cause).to be_nil
+        expect(error.message).to eq("ClarificationMailer::DeliveryFailed")
+        expect(error.full_message(highlight: false)).not_to include("lea.martin", "unknown recipient")
+      }
+    end
+  end
 end
