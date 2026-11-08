@@ -1,0 +1,30 @@
+fr:
+  magic_link_mailer:
+    sign_in:
+      subject: "Votre lien de connexion à Spotter"
+      intro: "Pour vous connecter à Spotter, ouvrez ce lien :"
+      action: "Me connecter"
+      expiry: "Ce lien est valable 15 minutes et ne sert qu’une fois. Si vous n’avez rien demandé, ignorez ce message."
+  sessions:
+    signed_out: "Vous êtes déconnecté."
+    destroy:
+      submit: "Se déconnecter"
+    destroy_all:
+      submit: "Se déconnecter partout"
+      done: "Vous êtes déconnecté de tous vos appareils."
+  magic_links:
+    new:
+      title: "Connexion"
+      email: "Adresse e-mail"
+      submit: "Recevoir un lien de connexion"
+    create:
+      title: "Vérifiez votre boîte de réception"
+      body: "Si l’adresse est valide, un lien de connexion vient d’y être envoyé. Il est valable 15 minutes."
+      invalid_email: "Cette adresse e-mail n’est pas valide."
+      too_many_requests: "Trop de demandes. Réessayez dans quelques minutes."
+    show:
+      title: "Connexion"
+      body: "Confirmez la connexion à Spotter."
+      submit: "Se connecter"
+    consume:
+      invalid: "Ce lien n’est plus valable. Demandez-en un nouveau."

@@ -22,6 +22,14 @@ Rails.application.configure do
   config.consider_all_requests_local = true
   config.cache_store = :null_store
 
+  # The rate limit needs a real counter, while the rest of the suite keeps the null cache.
+  config.x.rate_limit_store = ActiveSupport::Cache::MemoryStore.new
+
+  # Fixed, non-secret keys: test data is fictional.
+  config.active_record.encryption.primary_key = "test-primary-key-not-secret"
+  config.active_record.encryption.deterministic_key = "test-deterministic-key-not-secret"
+  config.active_record.encryption.key_derivation_salt = "test-key-derivation-salt-not-secret"
+
   # Render exception templates for rescuable exceptions and raise for other exceptions.
   config.action_dispatch.show_exceptions = :rescuable
 

@@ -24,6 +24,12 @@
   </head>
 
   <body>
+    <% if authenticated? %>
+      <nav class="container mx-auto px-5 py-3 flex justify-end gap-3">
+        <%= button_to t("sessions.destroy.submit"), session_path, method: :delete, class: "underline cursor-pointer" %>
+        <%= button_to t("sessions.destroy_all.submit"), sessions_path, method: :delete, class: "underline cursor-pointer" %>
+      </nav>
+    <% end %>
     <main class="container mx-auto mt-28 px-5 flex">
       <%= yield %>
     </main>

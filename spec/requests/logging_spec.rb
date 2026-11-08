@@ -25,4 +25,15 @@ RSpec.describe "Request logging", type: :request do
     expect(io.string).to include("Started GET")
     expect(io.string).not_to include(ip)
   end
+
+  it "masks the magic link token on both the GET and the POST" do
+    token = User.create!(email: "lea.martin@example.com").magic_link_token
+
+    get "/login/#{token}"
+    post "/login/#{token}"
+
+    expect(io.string.scan('Started GET "/login/[FILTERED]"').size).to eq(1)
+    expect(io.string.scan('Started POST "/login/[FILTERED]"').size).to eq(1)
+    expect(io.string).not_to include(token)
+  end
 end

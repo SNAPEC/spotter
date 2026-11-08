@@ -40,6 +40,15 @@ Rails.application.configure do
   # Set localhost to be used by links generated in mailer templates.
   config.action_mailer.default_url_options = { host: "localhost", port: 3000 }
 
+  # No mail leaves the machine; the sign-in link is written to the log instead.
+  config.action_mailer.delivery_method = :test
+  config.action_mailer.observers = %w[ MagicLinkLogObserver ]
+
+  # Fixed, non-secret keys: development data is fictional.
+  config.active_record.encryption.primary_key = "development-primary-key-not-secret"
+  config.active_record.encryption.deterministic_key = "development-deterministic-key-not-secret"
+  config.active_record.encryption.key_derivation_salt = "development-key-derivation-salt-not-secret"
+
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
 

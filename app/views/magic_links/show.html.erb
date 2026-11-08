@@ -1,0 +1,8 @@
+<% content_for :title, t(".title") %>
+
+<div class="mx-auto w-full max-w-md">
+  <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
+  <p class="mt-4"><%= t(".body") %></p>
+
+  <%= button_to t(".submit"), magic_link_path(params[:token]), class: "mt-6 rounded px-4 py-2 bg-blue-700 text-white font-medium cursor-pointer" %>
+</div>
