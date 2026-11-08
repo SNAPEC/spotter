@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_180001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_190001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -127,6 +127,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_180001) do
     t.index ["status"], name: "index_reports_on_status"
     t.index ["taxonomy_version_id"], name: "index_reports_on_taxonomy_version_id"
     t.index ["tracking_code_digest"], name: "index_reports_on_tracking_code_digest", unique: true
+    t.check_constraint "editable_until IS NULL OR taken_in_charge = false AND (status::text = ANY (ARRAY['submitted'::character varying, 'analyzing'::character varying, 'in_validation'::character varying]::text[]))", name: "reports_editable_until_check"
     t.check_constraint "event_type::text = ANY (ARRAY['accident'::character varying::text, 'incident'::character varying::text, 'near_miss'::character varying::text])", name: "reports_event_type_check"
     t.check_constraint "mode::text = ANY (ARRAY['confidential'::character varying::text, 'anonymous'::character varying::text])", name: "reports_mode_check"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'submitted'::character varying::text, 'analyzing'::character varying::text, 'in_validation'::character varying::text, 'validated'::character varying::text, 'rejected'::character varying::text])", name: "reports_status_check"
