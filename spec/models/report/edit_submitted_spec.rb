@@ -5,6 +5,8 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
   include ActiveSupport::Testing::TimeHelpers
 
   before { TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml")).publish! }
+  # Every report here is submitted on this day.
+  before { travel_to(Date.new(2026, 11, 17)) }
 
   let(:user) { User.create!(email: "lea.martin@example.com") }
   let(:other) { User.create!(email: "marc.petit@example.com") }
@@ -16,7 +18,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
   def submitted(mode: "confidential")
     report, = Report.start_draft!(mode: mode, user: (user if mode == "confidential"))
     report.save_draft!(event_type: "near_miss", narrative_attributes: { raw_text: old_text })
-    code = travel_to(Date.new(2026, 11, 17)) { report.submit! }
+    code = report.submit!
     [ report, code ]
   end
 
@@ -140,6 +142,49 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
 
       report.edit_submitted!(edit, user: user)
       expect(report.reload.content_revision).to eq(1)
+    end
+  end
+
+  describe "editing window" do
+    it "opens on submission for as long as the ownership" do
+      expect(report.editable_until).to eq(Date.new(2027, 1, 16))
+      expect(report.editable_until).to eq(report.report_ownership.cutoff_on)
+    end
+
+    it "lets the anonymous declarant edit up to day 60 after submission, not after" do
+      anonymous, code = submitted(mode: "anonymous")
+
+      travel_to(Date.new(2027, 1, 16)) { anonymous.edit_submitted!(edit, tracking_code: code) }
+      travel_to(Date.new(2027, 1, 17)) do
+        expect { anonymous.edit_submitted!({ event_type: "accident" }, tracking_code: code) }.to raise_error(Report::InvalidTransition)
+      end
+      expect(anonymous.reload).to have_attributes(event_type: "incident", content_revision: 1)
+    end
+
+    # The authorship link goes on its cutoff day, which is also the window's last day: the confidential
+    # declarant is no longer recognised from that day on.
+    it "lets the confidential declarant edit until the authorship link goes" do
+      expect(report.editable_until).to eq(Date.new(2027, 1, 16))
+      travel_to(Date.new(2027, 1, 15)) { report.edit_submitted!(edit, user: user) }
+      [ Date.new(2027, 1, 16), Date.new(2027, 1, 17) ].each do |day|
+        travel_to(day) { expect { report.edit_submitted!({ event_type: "accident" }, user: user) }.to raise_error(Report::NotAllowed) }
+      end
+      expect(report.reload).to have_attributes(event_type: "incident", content_revision: 1)
+    end
+
+    it "refuses a recognised declarant once the window is closed or was never opened" do
+      anonymous, code = submitted(mode: "anonymous")
+      anonymous.update_column(:editable_until, nil)
+      report.update_column(:editable_until, Date.yesterday)
+
+      expect { anonymous.edit_submitted!(edit, tracking_code: code) }.to raise_error(Report::InvalidTransition)
+      expect { report.edit_submitted!(edit, user: user) }.to raise_error(Report::InvalidTransition)
+    end
+
+    it "checks the declarant before the window" do
+      report.update_column(:editable_until, nil)
+
+      expect { report.edit_submitted!(edit, user: other) }.to raise_error(Report::NotAllowed)
     end
   end
 

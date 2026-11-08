@@ -115,7 +115,8 @@ class Report < ApplicationRecord
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
         self.declarant_notified = false unless was_awaiting
-        update!(taken_in_charge: true)
+        close_editing
+        save!
       end
     end
   end
@@ -130,7 +131,8 @@ class Report < ApplicationRecord
       next if taken_in_charge?
 
       AccessLog.record!(user: analyst, report: self, action: "take_charge")
-      update!(taken_in_charge: true)
+      close_editing
+      save!
     end
   end
 
