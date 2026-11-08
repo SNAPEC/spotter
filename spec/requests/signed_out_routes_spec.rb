@@ -12,21 +12,7 @@ RSpec.describe "Routes for a signed-out visitor", type: :request do
     "GET /up" => "health check, no data",
     "GET /recede_historical_location" => "Turbo Native history helper: a static page, no data",
     "GET /resume_historical_location" => "Turbo Native history helper: a static page, no data",
-    "GET /refresh_historical_location" => "Turbo Native history helper: a static page, no data",
-    "POST /rails/action_mailbox/postmark/inbound_emails" => "Action Mailbox ingress: 404 while no ingress is configured",
-    "POST /rails/action_mailbox/relay/inbound_emails" => "Action Mailbox ingress: 404 while no ingress is configured",
-    "POST /rails/action_mailbox/sendgrid/inbound_emails" => "Action Mailbox ingress: 404 while no ingress is configured",
-    "GET /rails/action_mailbox/mandrill/inbound_emails" => "Action Mailbox ingress: 404 while no ingress is configured",
-    "POST /rails/action_mailbox/mandrill/inbound_emails" => "Action Mailbox ingress: 404 while no ingress is configured",
-    "POST /rails/action_mailbox/mailgun/inbound_emails/mime" => "Action Mailbox ingress: 404 while no ingress is configured",
-    "GET /rails/conductor/action_mailbox/inbound_emails" => "Action Mailbox conductor: refused outside development",
-    "POST /rails/conductor/action_mailbox/inbound_emails" => "Action Mailbox conductor: refused outside development",
-    "GET /rails/conductor/action_mailbox/inbound_emails/new" => "Action Mailbox conductor: refused outside development",
-    "GET /rails/conductor/action_mailbox/inbound_emails/:id" => "Action Mailbox conductor: refused outside development",
-    "GET /rails/conductor/action_mailbox/inbound_emails/sources/new" => "Action Mailbox conductor: refused outside development",
-    "POST /rails/conductor/action_mailbox/inbound_emails/sources" => "Action Mailbox conductor: refused outside development",
-    "POST /rails/conductor/action_mailbox/:inbound_email_id/reroute" => "Action Mailbox conductor: refused outside development",
-    "POST /rails/conductor/action_mailbox/:inbound_email_id/incinerate" => "Action Mailbox conductor: refused outside development"
+    "GET /refresh_historical_location" => "Turbo Native history helper: a static page, no data"
   }.freeze
 
   def self.routes
