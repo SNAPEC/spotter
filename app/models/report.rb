@@ -32,7 +32,7 @@ class Report < ApplicationRecord
   validates :mode, inclusion: { in: MODES }
   validates :status, inclusion: { in: STATUSES }
   validates :event_type, inclusion: { in: EVENT_TYPES }, allow_nil: true
-  before_validation :cast_answers, if: :taxonomy_version
+  before_validation :cast_answers, if: -> { taxonomy_version && will_save_change_to_answers? }
   validate :taxonomy_codes_are_options, :answers_fit_taxonomy, if: :taxonomy_version
   validate :casualties_within_limit
 
@@ -117,12 +117,6 @@ class Report < ApplicationRecord
   # The state conditions of edit_submitted!, with no identity involved.
   def editable_by_declarant?
     under_analysis? && !taken_in_charge? && !raw_content_purged? && editable_until.present? && editable_until >= Date.current
-  end
-
-  # Whether the declarant can still be reached: a live authorship link, or a tracking code. Answers
-  # without loading the user.
-  def declarant_reachable?
-    confidential? ? ReportOwnership.live.exists?(report_id: id) : tracking_code_digest.present?
   end
 
   def open_draft?

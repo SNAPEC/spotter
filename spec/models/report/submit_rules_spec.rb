@@ -143,32 +143,6 @@ RSpec.describe Report, "submission rules, casualties limit and predicates", type
     end
   end
 
-  describe "#declarant_reachable?" do
-    it "is true for a confidential report with a live ownership, without loading the user" do
-      expect(User).not_to receive(:find_by)
-
-      expect(report).to be_declarant_reachable
-    end
-
-    it "is false once the ownership is cut or past its cutoff" do
-      report.report_ownership.update_columns(cutoff_on: Date.current)
-
-      expect(report).not_to be_declarant_reachable
-
-      ReportOwnership.cut_due
-      expect(report.reload).not_to be_declarant_reachable
-    end
-
-    it "is true for an anonymous report only once it has a tracking code" do
-      anonymous, = Report.start_draft!(mode: "anonymous")
-      expect(anonymous).not_to be_declarant_reachable
-
-      anonymous.save_draft!(event_type: "incident", narrative_attributes: { raw_text: "Récit fictif." })
-      anonymous.submit!
-      expect(anonymous.reload).to be_declarant_reachable
-    end
-  end
-
   describe "French dates" do
     it "prints month and day names" do
       date = Date.new(2026, 11, 8)
