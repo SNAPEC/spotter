@@ -170,6 +170,10 @@ class User < ApplicationRecord
     analyst? || admin?
   end
 
+  def active_staff?
+    staff? && active?
+  end
+
   def member?
     membership_expires_on.present? && membership_expires_on >= Date.current
   end

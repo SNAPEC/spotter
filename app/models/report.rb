@@ -113,7 +113,7 @@ class Report < ApplicationRecord
   # starts waiting for the declarant opens a new round for the weekly digest; a second question in a row
   # stays in the same round.
   def ask_clarification!(analyst, body)
-    raise Report::NotAllowed, "only staff ask for clarification" unless analyst&.staff?
+    raise Report::NotAllowed, "only active staff ask for clarification" unless analyst&.active_staff?
 
     with_lock do
       was_awaiting = awaiting_clarification?
@@ -129,7 +129,7 @@ class Report < ApplicationRecord
   # From then on the declarant can no longer edit the report: the analyst works on a stable text. Any
   # other staff action closes editing too. A second call changes nothing and leaves no second trail.
   def take_charge!(analyst)
-    raise Report::NotAllowed, "only staff take a report in charge" unless analyst&.staff?
+    raise Report::NotAllowed, "only active staff take a report in charge" unless analyst&.active_staff?
 
     with_lock do
       raise Report::InvalidTransition, "cannot take a #{status} report in charge" unless under_analysis?

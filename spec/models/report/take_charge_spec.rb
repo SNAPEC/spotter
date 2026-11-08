@@ -49,6 +49,19 @@ RSpec.describe Report, "taking in charge", type: :model do
       expect(take_charge_logs).to be_empty
     end
 
+    it "refuses a deactivated staff account, for every staff action" do
+      admin = User.create!(email: "marc.petit@example.com", role: "admin")
+      analyst.deactivate!(by: admin)
+      Report::Analyzer.new.call(report, revision: report.content_revision)
+
+      expect { report.take_charge!(analyst) }.to raise_error(Report::NotAllowed)
+      expect { report.ask_clarification!(analyst, "Question fictive ?") }.to raise_error(Report::NotAllowed)
+      expect { report.validate!(analyst) }.to raise_error(Report::NotAllowed)
+      expect { report.reject!(analyst) }.to raise_error(Report::NotAllowed)
+      expect(report.reload).not_to be_taken_in_charge
+      expect(AccessLog.where(report_id: report.id)).to be_empty
+    end
+
     it "refuses a draft or a decided report" do
       draft, = Report.start_draft!(mode: "confidential", user: user)
       report.reject!(analyst)
