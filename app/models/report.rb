@@ -11,6 +11,7 @@ class Report < ApplicationRecord
   class InvalidTransition < StandardError; end
   class NotAllowed < StandardError; end
   class DigestIncomplete < StandardError; end
+  class RawContentPurgeFailed < StandardError; end
 
   include Lifecycle
 

@@ -124,6 +124,33 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     expect(report.reload).to have_attributes(raw_content_purged: true, status: "analyzing")
   end
 
+  context "when a report cannot be purged" do
+    let(:reported) { [] }
+    let(:subscriber) { Struct.new(:errors) { def report(error, **) = errors << error }.new(reported) }
+
+    around do |example|
+      Rails.error.subscribe(subscriber)
+      example.run
+    ensure
+      Rails.error.unsubscribe(subscriber)
+    end
+
+    it "purges the others, and one whose answers no longer pass the checks" do
+      stuck = in_validation
+      stuck.analyses.sole.update_column(:model, "")
+      outdated = in_validation
+      outdated.update_column(:answers, { "retired_field" => "x" })
+      other = in_validation
+
+      purge_on(due_day)
+
+      expect([ outdated, other ].map { |report| report.reload.raw_content_purged }).to eq([ true, true ])
+      expect(stuck.reload.raw_content_purged).to be(false)
+      expect(Narrative.find_by(report_id: stuck.id).raw_text).to eq("Récit fictif.")
+      expect(reported.map(&:message)).to eq([ "ActiveRecord::RecordInvalid on report #{stuck.id}" ])
+    end
+  end
+
   it "leaves drafts and decided reports alone" do
     draft, = travel_to(submission_day) { Report.start_draft!(mode: "anonymous") }
     decided = in_validation

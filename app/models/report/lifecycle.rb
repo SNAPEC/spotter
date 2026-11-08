@@ -117,8 +117,14 @@ module Report::Lifecycle
   end
 
   class_methods do
+    # One report that cannot be purged must not keep the others' content: it is reported, by error class
+    # and id only (a message may quote the narrative), and tried again the next day.
     def purge_overdue_raw_content
-      raw_content_overdue.find_each(&:purge_overdue_raw_content!)
+      raw_content_overdue.find_each do |report|
+        report.purge_overdue_raw_content!
+      rescue StandardError => error
+        Rails.error.report(Report::RawContentPurgeFailed.new("#{error.class.name} on report #{report.id}"), handled: true)
+      end
     end
   end
 
@@ -132,7 +138,8 @@ module Report::Lifecycle
       # The status stays: a new revision makes an analysis still running on the purged text write
       # nothing, its excerpts would bring the text back. A decision changes the status instead.
       self.content_revision += 1
-      save!
+      # Only purge flags change here: a report whose content no longer passes the current checks is purged all the same.
+      save!(validate: false)
     end
   end
 
