@@ -2,4 +2,7 @@
 # with the mail provider's own log, that would map a report to its author's address.
 class ClarificationMailDeliveryJob < ActionMailer::MailDeliveryJob
   self.log_arguments = false
+
+  queue_as :default
+  discard_on ActiveJob::DeserializationError
 end
