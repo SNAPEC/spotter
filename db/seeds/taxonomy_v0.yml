@@ -1,0 +1,433 @@
+# Taxonomy v0 for climbing RETEX. Labels in French (UI language).
+# Positions follow list order. Codes are stable English identifiers.
+number: 0
+fields:
+  # --- Context ---
+  - code: discipline
+    group: context
+    kind: single
+    scope: report
+    label: Discipline
+    options:
+      - { code: bouldering, label: Bloc }
+      - { code: top_rope, label: Voie en moulinette }
+      - { code: lead, label: Voie en tête }
+      - { code: multi_pitch, label: Grande voie }
+      - { code: trad, label: Terrain d'aventure }
+      - { code: auto_belay, label: Enrouleur }
+      - { code: abseil, label: Rappel }
+      - { code: approach, label: Marche d'approche ou de retour }
+  - code: environment
+    group: context
+    kind: single
+    scope: report
+    label: Milieu
+    options:
+      - { code: indoor, label: Salle (SAE) }
+      - { code: outdoor, label: Site naturel (SNE) }
+  - code: site_classification
+    group: context
+    kind: single
+    scope: report
+    label: Classement du site (en site naturel)
+    options:
+      - { code: sport, label: Sportif }
+      - { code: adventure, label: Terrain d'aventure }
+  - code: session_type
+    group: context
+    kind: single
+    scope: report
+    label: Type de séance
+    options:
+      - { code: discovery, label: Découverte }
+      - { code: regular_course, label: Cours régulier }
+      - { code: course_or_trip, label: Stage ou sortie }
+      - { code: instructor_training, label: Formation de cadres }
+      - { code: one_off, label: Animation ponctuelle }
+  - code: group_type
+    group: context
+    kind: single
+    scope: report
+    label: Type de groupe
+    options:
+      - { code: individuals, label: Groupe d'individuels }
+      - { code: school_or_youth, label: Scolaire ou accueil collectif de mineurs }
+      - { code: club_or_other, label: Club, collectivité ou autre }
+  - code: clients_count
+    group: context
+    kind: integer
+    scope: report
+    label: Nombre de clients
+  - code: instructors_count
+    group: context
+    kind: integer
+    scope: report
+    label: Nombre d'encadrants
+  - code: instructor_qualification
+    group: context
+    kind: single
+    scope: report
+    label: Qualification du moniteur
+    options:
+      - { code: be, label: Brevet d'État }
+      - { code: dejeps, label: DEJEPS }
+      - { code: specialisation, label: Certificat de spécialisation }
+      - { code: cqp, label: CQP }
+      - { code: trainee, label: Stagiaire }
+  - code: session_phase
+    group: context
+    kind: single
+    scope: report
+    label: Phase de la séance
+    options:
+      - { code: arrival, label: Accueil et équipement }
+      - { code: approach, label: Approche }
+      - { code: warm_up, label: Échauffement }
+      - { code: climbing, label: Grimpe }
+      - { code: belaying, label: Assurage }
+      - { code: top_manoeuvre, label: Manip de haut de voie }
+      - { code: descent, label: Descente }
+      - { code: return, label: Retour }
+      - { code: packing, label: Rangement }
+  - code: time_of_day
+    group: context
+    kind: single
+    scope: report
+    label: Moment de la journée
+    options:
+      - { code: morning, label: Matin }
+      - { code: afternoon, label: Après-midi }
+      - { code: evening, label: Soir }
+  - code: session_moment
+    group: context
+    kind: single
+    scope: report
+    label: Moment de la séance
+    options:
+      - { code: start, label: Début }
+      - { code: middle, label: Milieu }
+      - { code: end, label: Fin }
+  - code: weather
+    group: context
+    kind: single
+    scope: report
+    label: Météo
+    options:
+      - { code: good, label: Bonne }
+      - { code: average, label: Moyenne }
+      - { code: bad, label: Mauvaise }
+  - code: rock_condition
+    group: context
+    kind: single
+    scope: report
+    label: État du rocher
+    options:
+      - { code: dry, label: Sec }
+      - { code: wet, label: Humide }
+  - code: conditions
+    group: context
+    kind: multi
+    scope: report
+    label: Autres conditions
+    options:
+      - { code: heat, label: Chaleur }
+      - { code: crowding, label: Affluence }
+
+  # --- Event ---
+  - code: cause
+    group: event
+    kind: single
+    scope: report
+    label: Cause principale
+    options:
+      - { code: bad_landing, label: Mauvaise réception, definition: "Chute inhérente à la pratique, sans autre cause" }
+      - { code: technical_error, label: Erreur technique, definition: "Corde derrière la jambe, protections amovibles mal placées, corde non égalisée en rappel, corde dans la bouche" }
+      - { code: belay_error, label: Erreur d'assurage, definition: "Assurage trop sec ou trop mou, descente trop rapide, corde lâchée" }
+      - { code: spotting_error, label: Erreur de parade, definition: "Parade absente ou mauvaise, blessure du pareur" }
+      - { code: tie_in_error, label: Erreur d'encordement, definition: "Oubli du nœud ou de l'encordement à l'enrouleur, nœud mal fait" }
+      - { code: rope_too_short, label: Corde trop courte, definition: "En moulinette ou en rappel, sans nœud en bout de corde" }
+      - { code: communication_error, label: Erreur de communication, definition: "Assureur qui retire son système alors que le grimpeur grimpe encore ou fait sa manip" }
+      - { code: traumatic_movement, label: Mouvement traumatisant, definition: "Poulie, rupture musculaire, luxation en mouvement" }
+      - { code: mats, label: Tapis, definition: "Tapis disjoints, dégradés ou usés, crash pads mal placés" }
+      - { code: hazardous_setting, label: Ouverture accidentogène, definition: "Volume mal placé, mouvement dangereux en haut d'un bloc" }
+      - { code: collision, label: Collision de personnes, definition: "Chute sur un tiers dans la zone de réception, pendule sur une cordée voisine" }
+      - { code: installation_failure, label: Défaillance équipement, definition: "Ancrage ou relais qui casse, défaut d'enrouleur" }
+      - { code: gear_failure, label: Défaillance matériel, definition: "EPI défectueux, matériel d'assurage cassé" }
+      - { code: surface_failure, label: Défaillance support, definition: "Prise qui casse ou tourne, vis qui dépasse, arête saillante" }
+      - { code: falling_object, label: Chute d'objet, definition: "Chute de pierre ou de matériel" }
+      - { code: unsuitable_route, label: Choix d'itinéraire inadapté, definition: "Itinéraire inadapté au niveau, mauvais repérage" }
+      - { code: access, label: Accès, definition: "Accident sur la marche d'approche ou de retour, ou en pied de voie hors de l'activité" }
+      - { code: other, label: Autres, definition: "Accident hors du cadre direct de l'activité" }
+  - code: person_involved
+    group: event
+    kind: single
+    scope: report
+    label: Personne concernée
+    options:
+      - { code: climber, label: Grimpeur }
+      - { code: belayer, label: Assureur }
+      - { code: spotter, label: Pareur }
+      - { code: instructor, label: Moniteur }
+      - { code: third_party, label: Tiers }
+  - code: belay_system
+    group: event
+    kind: single
+    scope: report
+    label: Système d'assurage
+    options:
+      - { code: manual, label: Manuel (SAM) }
+      - { code: assisted_braking, label: À freinage assisté (SAFA) }
+      - { code: assisted_locking, label: À blocage assisté (SABA) }
+      - { code: auto_belay, label: Enrouleur }
+      - { code: not_applicable, label: Sans objet }
+  - code: belayer
+    group: event
+    kind: single
+    scope: report
+    label: Assureur
+    options:
+      - { code: instructor, label: Moniteur }
+      - { code: client, label: Client }
+      - { code: other_professional, label: Autre professionnel }
+  - code: mechanism
+    group: event
+    kind: single
+    scope: report
+    label: Mécanisme
+    options:
+      - { code: ground_fall, label: Retour au sol }
+      - { code: arrested_fall_impact, label: Chute arrêtée avec choc contre la paroi }
+      - { code: landing, label: Réception au sol ou sur tapis }
+      - { code: movement_without_fall, label: Mouvement sans chute }
+      - { code: falling_object, label: Chute de pierre ou d'objet }
+      - { code: slip, label: Chute de plain-pied ou glissade }
+  - code: fall_height
+    group: event
+    kind: single
+    scope: report
+    label: Hauteur de chute
+    options:
+      - { code: under_2m, label: Moins de 2 m }
+      - { code: from_2_to_5m, label: 2 à 5 m }
+      - { code: from_5_to_10m, label: 5 à 10 m }
+      - { code: over_10m, label: Plus de 10 m }
+
+  # --- Consequences ---
+  - code: severity
+    group: consequences
+    kind: single
+    scope: report
+    label: Gravité
+    options:
+      - { code: material_damage, label: Dégât matériel, definition: "Aucun blessé, équipement endommagé" }
+      - { code: minor, label: Légère, definition: "Contusion, plaie superficielle, entorse simple, traumatisme crânien sans perte de connaissance" }
+      - { code: moderate, label: Modérée, definition: "Fracture simple, luxation, entorse grave, traumatisme crânien avec perte de connaissance brève" }
+      - { code: severe, label: Sévère, definition: "Perte de connaissance persistante, fracture complexe ou de vertèbre stable, polytraumatisme avec potentiel de guérison" }
+      - { code: critical, label: Critique, definition: "Traumatisme crânien grave, fracture de vertèbre avec paralysie, pronostic vital ou fonctionnel engagé" }
+      - { code: fatal, label: Décès, definition: "Décès, état végétatif" }
+  - code: session_outcome
+    group: consequences
+    kind: single
+    scope: report
+    label: Suite de la séance
+    options:
+      - { code: continued, label: Poursuivie }
+      - { code: stopped_for_victim, label: Arrêtée pour la victime }
+      - { code: stopped_for_group, label: Arrêtée pour le groupe }
+  - code: rescue
+    group: consequences
+    kind: single
+    scope: report
+    label: Secours
+    options:
+      - { code: none, label: Aucun }
+      - { code: instructor_care, label: Soins par le moniteur }
+      - { code: public_services, label: Secours publics }
+  - code: responders
+    group: consequences
+    kind: multi
+    scope: report
+    label: Intervenants
+    options:
+      - { code: pghm, label: PGHM }
+      - { code: pgm, label: PGM }
+      - { code: crs, label: CRS }
+      - { code: firefighters, label: Pompiers }
+      - { code: grimp, label: GRIMP }
+      - { code: other_professional, label: Autre professionnel }
+      - { code: third_party, label: Tiers }
+  - code: alert_means
+    group: consequences
+    kind: single
+    scope: report
+    label: Moyen d'alerte
+    options:
+      - { code: phone, label: Téléphone }
+      - { code: radio, label: Radio }
+      - { code: satellite, label: Message par satellite }
+      - { code: other, label: Autre }
+  - code: evacuation
+    group: consequences
+    kind: single
+    scope: report
+    label: Évacuation
+    options:
+      - { code: self, label: Par ses propres moyens }
+      - { code: ground, label: Terrestre }
+      - { code: helicopter, label: Hélicoptère }
+  - code: rescue_delay
+    group: consequences
+    kind: single
+    scope: report
+    label: Délai d'arrivée des secours
+    options:
+      - { code: under_30min, label: Moins de 30 min }
+      - { code: from_30_to_60min, label: 30 à 60 min }
+      - { code: from_1_to_2h, label: 1 à 2 h }
+      - { code: over_2h, label: Plus de 2 h }
+  - code: material_damage
+    group: consequences
+    kind: text
+    scope: report
+    label: Dommage matériel (lequel)
+
+  # --- Casualty (one per injured person, no identity) ---
+  - code: age_range
+    group: casualty
+    kind: single
+    scope: casualty
+    label: Tranche d'âge
+    options:
+      - { code: under_12, label: Moins de 12 ans }
+      - { code: from_12_to_17, label: 12 à 17 ans }
+      - { code: from_18_to_39, label: 18 à 39 ans }
+      - { code: from_40_to_59, label: 40 à 59 ans }
+      - { code: over_60, label: 60 ans et plus }
+  - code: experience
+    group: casualty
+    kind: single
+    scope: casualty
+    label: Niveau d'expérience
+    options:
+      - { code: beginner, label: Débutant }
+      - { code: intermediate, label: Débrouillé }
+      - { code: experienced, label: Expérimenté }
+      - { code: expert, label: Expert }
+  - code: injury_location
+    group: casualty
+    kind: single
+    scope: casualty
+    label: Siège de la blessure
+    options:
+      - { code: head_face, label: Tête et visage }
+      - { code: spine, label: Rachis }
+      - { code: shoulder_arm, label: Épaule et bras }
+      - { code: hand_fingers, label: Main et doigts }
+      - { code: trunk, label: Tronc }
+      - { code: knee_leg, label: Genou et jambe }
+      - { code: ankle_foot, label: Cheville et pied }
+      - { code: multiple, label: Plusieurs sièges }
+  - code: injury_nature
+    group: casualty
+    kind: multi
+    scope: casualty
+    label: Nature de la lésion
+    options:
+      - { code: bruise_wound, label: Contusion ou plaie }
+      - { code: sprain, label: Entorse }
+      - { code: dislocation, label: Luxation }
+      - { code: fracture, label: Fracture }
+      - { code: muscle_tendon, label: Lésion musculaire ou tendineuse (poulie) }
+      - { code: head_trauma, label: Traumatisme crânien }
+      - { code: burn, label: Brûlure }
+
+  # --- Contributing and mitigating factors (several per RETEX) ---
+  - code: factors_instructor
+    group: factors
+    kind: multi
+    scope: report
+    label: Facteurs liés au moniteur
+    options:
+      - { code: fatigue, label: Fatigue }
+      - { code: divided_attention, label: Attention partagée entre plusieurs ateliers }
+      - { code: complacency, label: Routine ou excès de confiance }
+      - { code: time_pressure, label: Pression du temps }
+      - { code: unfamiliar_site, label: Site mal connu }
+      - { code: client_or_employer_pressure, label: Pression du client ou de l'employeur }
+  - code: factors_clients
+    group: factors
+    kind: multi
+    scope: report
+    label: Facteurs liés aux clients
+    options:
+      - { code: instruction_misunderstood, label: "Consigne mal comprise (âge, langue)" }
+      - { code: instruction_ignored, label: Consigne non respectée }
+      - { code: fear_stress, label: Peur ou stress }
+      - { code: fatigue, label: Fatigue }
+      - { code: overestimated_level, label: Niveau surestimé }
+  - code: factors_organisation
+    group: factors
+    kind: multi
+    scope: report
+    label: Organisation de la séance
+    options:
+      - { code: ratio_too_high, label: Trop de clients par encadrant }
+      - { code: unsuitable_activity, label: Atelier inadapté au public }
+      - { code: progression_too_fast, label: Progression trop rapide }
+      - { code: no_cross_check, label: Vérification croisée non faite }
+      - { code: incomplete_instructions, label: Consignes incomplètes }
+      - { code: client_out_of_sight, label: Client hors de vue }
+  - code: factors_communication
+    group: factors
+    kind: multi
+    scope: report
+    label: Communication
+    options:
+      - { code: climber_belayer, label: Entre grimpeur et assureur }
+      - { code: instructor_clients, label: Entre moniteur et clients }
+      - { code: between_instructors, label: Entre encadrants }
+  - code: factors_equipment
+    group: factors
+    kind: multi
+    scope: report
+    label: Matériel
+    options:
+      - { code: unsuitable, label: Inadapté }
+      - { code: unchecked_or_worn, label: Non vérifié ou usé }
+      - { code: misused, label: Mal utilisé (appareil mal connu) }
+  - code: factors_environment
+    group: factors
+    kind: multi
+    scope: report
+    label: Environnement
+    options:
+      - { code: loose_rock, label: Rocher instable }
+      - { code: site_equipment, label: Équipement du site }
+      - { code: weather, label: Météo }
+      - { code: crowding, label: Affluence }
+      - { code: noise_or_wind, label: Bruit ou vent qui gêne la communication }
+  - code: factors_decision_traps
+    group: factors
+    kind: multi
+    scope: report
+    label: Pièges de décision
+    options:
+      - { code: familiarity, label: Familiarité avec le site }
+      - { code: social_facilitation, label: Envie de bien paraître devant le groupe }
+      - { code: commitment, label: Attachement au programme prévu }
+      - { code: expert_halo, label: Confiance accordée à un « expert » }
+      - { code: scarcity, label: Dernière occasion }
+      - { code: acceptance, label: Présence d'autres grimpeurs }
+  - code: mitigating_factors
+    group: factors
+    kind: multi
+    scope: report
+    label: Facteurs atténuants
+    options:
+      - { code: double_check, label: Double vérification faite }
+      - { code: stopper_knot, label: Nœud en bout de corde }
+      - { code: helmet, label: Casque porté }
+      - { code: backup_belay, label: Contre-assurage ou nœuds de sécurité }
+      - { code: quick_reaction, label: Réaction rapide du moniteur }
+      - { code: first_aid, label: Premiers secours }
+      - { code: alert_available, label: Moyen d'alerte disponible }
