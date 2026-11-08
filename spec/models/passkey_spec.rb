@@ -51,8 +51,29 @@ RSpec.describe Passkey, type: :model do
       credential = client.create(user_verified: true).to_json
 
       expect { Passkey.register!(user: user, credential: credential, challenge: nil) }.to raise_error(Passkey::InvalidCredential)
-      expect { Passkey.register!(user: user, credential: "not json", challenge: "abc") }.to raise_error(Passkey::InvalidCredential)
-      expect { Passkey.register!(user: user, credential: "{}", challenge: "abc") }.to raise_error(Passkey::InvalidCredential)
+      [
+        "not json", "{}", "[]", "null", %("a string"),
+        { type: "public-key", id: "eA", rawId: "eA", response: "nope" }.to_json,
+        { type: "public-key", id: "eA", rawId: "eA", response: {} }.to_json,
+        { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: 1, attestationObject: [] } }.to_json,
+        { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: "@@@", attestationObject: "@@@" } }.to_json,
+        { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: "e30", attestationObject: "AAAA" } }.to_json
+      ].each do |malformed|
+        expect { Passkey.register!(user: user, credential: malformed, challenge: "abc") }
+          .to raise_error(Passkey::InvalidCredential), malformed
+      end
+    end
+
+    it "refuses the same credential twice through the unique index, as in a concurrent double submit" do
+      # An authenticator that hands out the same credential every time.
+      replaying = Class.new(WebAuthn::FakeAuthenticator) do
+        private def new_credential(algorithm) = (@credential ||= super)
+      end
+      same = WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin, authenticator: replaying.new)
+      register(user, client: same)
+
+      expect { register(user, client: same) }.to raise_error(Passkey::InvalidCredential)
+      expect(Passkey.count).to eq(1)
     end
   end
 
@@ -100,7 +121,9 @@ RSpec.describe Passkey, type: :model do
     end
 
     it "refuses a malformed credential" do
-      expect(Passkey.authenticate(user: user, credential: "nope", challenge: "abc")).to be_nil
+      [ "nope", "{}", "[]", { type: "public-key", id: "eA", rawId: "eA", response: { signature: 1 } }.to_json ].each do |malformed|
+        expect(Passkey.authenticate(user: user, credential: malformed, challenge: "abc")).to be_nil
+      end
     end
   end
 end
