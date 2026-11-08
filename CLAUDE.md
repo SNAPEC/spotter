@@ -55,4 +55,9 @@ Steering documents (decisions, to-do list, session handover, third-party agreeme
 
 ## Commands
 
-To be filled in once the application is generated.
+- `bin/setup`: dependencies, database, fictional seeds on creation, then `bin/dev`.
+- `bin/dev`: server and Tailwind watcher (port 3000).
+- `bundle exec rspec [paths]`, `bin/rubocop [paths]`, `bin/brakeman --no-pager -q`, `bin/bundler-audit`.
+- `bin/rails tailwindcss:build`: compiled CSS (for a screenshot without `bin/dev`).
+- `scripts/ci/install-hooks.sh`: once after cloning.
+- In development: `/dev/login` (fictional account), `/dev/styleguide` (components).
