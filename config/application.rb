@@ -37,6 +37,10 @@ module Spotter
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
 
+    # Its routes serve and accept files without authentication. Files will go through our own authorised
+    # controllers.
+    config.active_storage.draw_routes = false
+
     # Don't generate system test files.
     config.generators.system_tests = nil
   end
