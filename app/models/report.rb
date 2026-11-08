@@ -10,6 +10,7 @@ class Report < ApplicationRecord
 
   class InvalidTransition < StandardError; end
   class NotAllowed < StandardError; end
+  class DigestIncomplete < StandardError; end
 
   include Lifecycle
 
@@ -32,6 +33,11 @@ class Report < ApplicationRecord
   validate :taxonomy_codes_are_options, :answers_fit_taxonomy, if: :taxonomy_version
 
   scope :expired_drafts, -> { where(status: "draft", draft_expires_on: ...Date.current) }
+  # Anonymous reports have no one to write to: they are left alone.
+  scope :awaiting_declarant_notice, -> {
+    where(mode: "confidential", status: UNDER_ANALYSIS_STATUSES, declarant_notified: false)
+      .where(id: Clarification.where(author: "analyst").select(:report_id))
+  }
 
   # The draft token is returned in clear once, for the anonymous declarant's cookie. A confidential
   # draft is found through its ownership instead, so it gets no token.
@@ -98,8 +104,9 @@ class Report < ApplicationRecord
     draft? && draft_expires_on < Date.current
   end
 
-  # The declarant is told by mail, after the commit, when the report starts waiting for them and
-  # still has a live ownership: a second question in a row sends nothing.
+  # No mail leaves now: its time in the mail provider's log would date the question. A report that
+  # starts waiting for the declarant opens a new round for the weekly digest; a second question in a row
+  # stays in the same round.
   def ask_clarification!(analyst, body)
     raise Report::NotAllowed, "only staff ask for clarification" unless analyst&.staff?
 
@@ -107,8 +114,39 @@ class Report < ApplicationRecord
       was_awaiting = awaiting_clarification?
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
-        ActiveRecord.after_all_transactions_commit { ClarificationMailer.requested(self).deliver_later } unless was_awaiting
+        update!(declarant_notified: false) unless was_awaiting
       end
+    end
+  end
+
+  # One mail per declarant at a fixed time, whatever the number of reports and nothing of them: the mail
+  # provider's log tells neither when a question was asked nor on which report. The mail carries only the
+  # user. Without a live ownership or with a deactivated account, nothing is sent.
+  #
+  # At least once: a duplicate neutral mail costs nothing, a lost one stalls the exchange. Each user's
+  # mail is queued before their reports are marked, so a failed enqueue leaves them for the next run;
+  # each report is marked in its own transaction, so one report cannot hold back the others.
+  def self.notify_declarants
+    reports_by_user_id = awaiting_declarant_notice.find_each.select(&:awaiting_clarification?).group_by do |report|
+      ReportOwnership.live.find_by(report_id: report.id)&.user_ref
+    end.except(nil)
+
+    unsent = User.active.where(id: reports_by_user_id.keys).find_each.reject do |user|
+      queued = ClarificationMailer.digest(user).deliver_later
+      reports_by_user_id[user.id.to_s].each(&:mark_declarant_notified) if queued
+      queued
+    end
+    raise Report::DigestIncomplete if unsent.any?
+  end
+
+  # Called when a digest could not be delivered: the user's reports wait for the next run.
+  def self.reopen_declarant_notices(user)
+    where(id: ReportOwnership.live.of(user).select(:report_id), declarant_notified: true).update_all(declarant_notified: false)
+  end
+
+  def mark_declarant_notified
+    with_lock do
+      update_column(:declarant_notified, true) if under_analysis? && awaiting_clarification?
     end
   end
 

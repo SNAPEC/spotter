@@ -6,10 +6,10 @@ fr:
       action: "Me connecter"
       expiry: "Ce lien est valable 15 minutes et ne sert qu’une fois. Si vous n’avez rien demandé, ignorez ce message."
   clarification_mailer:
-    requested:
-      subject: "Une question sur l’un de vos signalements"
-      intro: "Un analyste a une question sur l’un de vos signalements. Connectez-vous à Spotter pour la lire et y répondre :"
-      action: "Ouvrir Spotter"
+    digest:
+      subject: "Du nouveau sur Spotter"
+      intro: "Il y a du nouveau pour vous sur Spotter. Connectez-vous pour le consulter :"
+      action: "Se connecter à Spotter"
   sessions:
     signed_out: "Vous êtes déconnecté."
     destroy:

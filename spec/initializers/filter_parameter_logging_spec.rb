@@ -17,4 +17,10 @@ RSpec.describe "Filtered parameters" do
     expect(filtered).not_to include("Texte libre fictif", "Détail fictif", "Récit anonymisé fictif")
     expect(filtered).to include("[FILTERED]")
   end
+
+  it "leaves a record's id visible when inspected" do
+    report = Report.new(id: SecureRandom.uuid)
+
+    expect(report.inspect).to include(report.id)
+  end
 end
