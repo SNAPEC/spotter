@@ -1,6 +1,9 @@
 require "rails_helper"
 
 # End to end: whatever path a request or a report takes, the client's IP address must end up nowhere.
+# Not covered: the Solid Queue tables, since the test adapter keeps jobs in memory, and the separate
+# production cache and queue databases. The risk is low: job arguments are records, never request data,
+# and the rate limiter keys the cache on an HMAC of the IP, which this spec checks.
 RSpec.describe "No IP address anywhere", type: :request do
   include ActiveJob::TestHelper
 
@@ -73,8 +76,9 @@ RSpec.describe "No IP address anywhere", type: :request do
     post login_path, params: { email: declarant.email }, env: env, headers: { "Client-IP" => spoofed_ip, "X-Forwarded-For" => ip }
     expect(response).to have_http_status(:bad_request)
 
-    # Any mounted app logs on its own; Action Cable, for one, logged the client address.
+    # Action Cable logged the client address on connection: it is removed, and its route must stay gone.
     get "/cable", env: env
+    expect(response).to have_http_status(:not_found)
 
     sign_in_over_http(analyst.email)
     post recovery_code_path, params: { code: analyst.generate_recovery_codes!.first }, env: env
