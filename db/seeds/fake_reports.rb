@@ -39,6 +39,7 @@ report_specs = [
     casualties: [ { severity: "minor", answers: { "age_range" => "from_18_to_39", "experience" => "intermediate", "injury_location" => "shoulder_arm", "injury_nature" => [ "bruise_wound" ] } } ] },
   { status: "in_validation", mode: "confidential", event_type: "incident", discipline: "top_rope", environment: "outdoor", cause: "tie_in_error", severity: "material_damage",
     text: "Un nœud d'encordement mal terminé a été repéré par un tiers sur un site fictif, avant le départ du grimpeur.",
+    free_text_answers: { "material_damage" => "Corde fictive à remplacer" },
     clarification: "Pouvez-vous préciser qui a fait la vérification finale avant le départ ?" },
   { status: "in_validation", mode: "confidential", event_type: "near_miss", discipline: "approach", environment: "outdoor", cause: "hazardous_setting",
     text: "Sur le sentier d'approche d'une falaise fictive, un bloc instable s'est détaché près du groupe. Personne n'était dessous.",
@@ -72,7 +73,7 @@ begin
     report, _token = Report.start_draft!(mode: spec[:mode], user: (accounts.fetch(:declarant) if spec[:mode] == "confidential"))
     report.save_draft!(
       spec.slice(:event_type, :discipline, :environment, :cause, :severity).merge(
-        narrative_attributes: { raw_text: spec[:text] }.merge(spec.fetch(:debrief, {})),
+        narrative_attributes: { raw_text: spec[:text], free_text_answers: spec.fetch(:free_text_answers, {}) }.merge(spec.fetch(:debrief, {})),
         casualties_attributes: spec.fetch(:casualties, [])
       )
     )

@@ -1,4 +1,4 @@
-# The extractor's coded proposals for a report, then the analyst's changes and decisions on them.
+# The extractor's coded proposals for a report, then the analyst's changes to them.
 class Analysis < ApplicationRecord
   include ReadOnlyOnceDecided
 
@@ -6,6 +6,12 @@ class Analysis < ApplicationRecord
   PROVIDERS = %w[fake scaleway].freeze
 
   belongs_to :report
+
+  %i[proposals modifications].each do |column|
+    serialize column, coder: JSON
+    attribute column, default: -> { {} }
+    encrypts column
+  end
 
   validates :status, inclusion: { in: STATUSES }
   validates :provider, inclusion: { in: PROVIDERS }

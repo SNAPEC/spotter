@@ -4,7 +4,7 @@ class Report < ApplicationRecord
   STATUSES = %w[draft submitted analyzing in_validation validated rejected].freeze
   TAXONOMY_COLUMNS = %w[discipline environment cause severity].freeze
   DRAFT_ATTRIBUTES = %w[event_type discipline environment cause severity answers narrative_attributes casualties_attributes].freeze
-  DRAFT_NARRATIVE_ATTRIBUTES = [ "raw_text", *Narrative::DEBRIEF_FIELDS ].freeze
+  DRAFT_NARRATIVE_ATTRIBUTES = [ "raw_text", "free_text_answers", *Narrative::DEBRIEF_FIELDS ].freeze
   DRAFT_CASUALTY_ATTRIBUTES = %w[id severity answers _destroy].freeze
   DRAFT_VALIDITY = 30
 
@@ -30,7 +30,6 @@ class Report < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :event_type, inclusion: { in: EVENT_TYPES }, allow_nil: true
   validate :taxonomy_codes_are_options, :answers_fit_taxonomy, if: :taxonomy_version
-  validate :no_free_text_once_decided, if: -> { taxonomy_version && will_save_change_to_answers? }
 
   scope :expired_drafts, -> { where(status: "draft", draft_expires_on: ...Date.current) }
 
@@ -136,18 +135,6 @@ class Report < ApplicationRecord
       raise Report::InvalidTransition, "cannot exchange on a #{status} report" unless under_analysis?
 
       clarifications.create!(author: author, body: body, position: clarifications.maximum(:position).to_i + 1)
-    end
-
-    def free_text_codes
-      taxonomy_version.fields.where(kind: "text").pluck(:code)
-    end
-
-    # Checked against the stored status, like Narrative: the purge removed them, a stale copy must not
-    # bring them back.
-    def no_free_text_once_decided
-      return unless persisted? && Report.decided.exists?(id)
-
-      errors.add(:answers, :invalid) if answers.is_a?(Hash) && answers.keys.intersect?(free_text_codes)
     end
 
     def taxonomy_codes_are_options
