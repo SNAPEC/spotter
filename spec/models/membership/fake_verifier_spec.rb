@@ -9,6 +9,14 @@ RSpec.describe Membership::FakeVerifier do
     expect(Rails.configuration.x.membership_verifier).to be_a(described_class)
   end
 
+  it "never stands in for the membership API in production" do
+    production = Rails.application.config_for(:external_services, env: "production")
+
+    expect(production[:membership_verifier]).to eq("Membership::Verifier")
+    expect { production[:membership_verifier].constantize.new.call(email: "lea.martin@example.com") }.to raise_error(NotImplementedError)
+    expect(Rails.application.config_for(:external_services, env: "development")[:membership_verifier]).to eq("Membership::FakeVerifier")
+  end
+
   it "treats an address as a member until the end of the season" do
     travel_to(Date.new(2026, 11, 17)) do
       expect(verifier.call(email: "lea.martin@example.com")).to eq(valid: true, expires_on: Date.new(2027, 8, 31))
