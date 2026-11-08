@@ -138,6 +138,6 @@ module Report::Lifecycle
       clarifications.destroy_all
       analyses.each(&:strip_raw_excerpts!)
       report_ownership&.destroy!
-      assign_attributes(tracking_code_digest: nil, draft_token_digest: nil)
+      assign_attributes(tracking_code_digest: nil, draft_token_digest: nil, declarant_notified: false)
     end
 end

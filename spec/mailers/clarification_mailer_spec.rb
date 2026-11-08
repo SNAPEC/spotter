@@ -1,85 +1,44 @@
 require "rails_helper"
 
 RSpec.describe ClarificationMailer, type: :mailer do
-  include ActiveSupport::Testing::TimeHelpers
   include ActiveJob::TestHelper
 
-  before { TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml")).publish! }
-
   let(:user) { User.create!(email: "lea.martin@example.com") }
-  let(:analyst) { User.create!(email: "chloe.bernard@example.com", role: "analyst") }
-  let(:raw_text) { "Récit fictif d'une chute au relais." }
-  let(:question) { "Question fictive sur le type de noeud ?" }
-
-  def submitted(mode)
-    Report.start_draft!(mode: mode, user: (user if mode == "confidential")).first.tap do |report|
-      report.save_draft!(narrative_attributes: { raw_text: raw_text })
-      travel_to(Date.new(2026, 11, 17)) { report.submit! }
-    end
-  end
 
   def bodies(mail)
     [ mail.text_part, mail.html_part ].map { |part| part.body.decoded }
   end
 
-  it "sends the declarant one link and nothing of the report" do
-    report = submitted("confidential")
-    travel_to(Date.new(2026, 11, 20)) do
-      report.ask_clarification!(analyst, question)
-      mail = described_class.requested(report)
+  it "says only that there is something new, with one sign-in link" do
+    mail = described_class.digest(user)
 
-      expect(mail.to).to eq([ "lea.martin@example.com" ])
-      expect(mail.subject).to eq("Une question sur l’un de vos signalements")
-      bodies(mail).each do |body|
-        expect(body.scan(%r{https?://[^\s"<]+}).uniq).to eq([ "http://example.com/" ])
-        expect(body).not_to include("relais", "noeud", report.id)
-      end
-      expect(mail.subject).not_to include("noeud")
+    expect(mail.to).to eq([ "lea.martin@example.com" ])
+    expect(mail.subject).to eq("Du nouveau sur Spotter")
+    bodies(mail).each do |body|
+      expect(body.scan(%r{https?://[^\s"<]+}).uniq).to eq([ "http://example.com/login" ])
+    end
+    [ mail.subject, *bodies(mail) ].each do |text|
+      expect(text).not_to match(/signalement|question|retex/i)
     end
   end
 
-  it "sends nothing in anonymous mode" do
-    report = submitted("anonymous")
+  it "sends nothing to an account deactivated since the digest ran" do
+    described_class.digest(user).deliver_later
+    user.update!(deactivated_at: Time.current)
 
-    travel_to(Date.new(2026, 11, 20)) do
-      report.ask_clarification!(analyst, question)
-      expect { perform_enqueued_jobs }.not_to change { ActionMailer::Base.deliveries.size }
-    end
-  end
-
-  it "sends nothing once the cutoff is reached, even before the daily job cuts the link" do
-    report = submitted("confidential")
-
-    travel_to(report.report_ownership.cutoff_on) do
-      report.ask_clarification!(analyst, question)
-      expect { perform_enqueued_jobs }.not_to change { ActionMailer::Base.deliveries.size }
-      expect(ReportOwnership.where(report_id: report.id)).to exist
-    end
-  end
-
-  it "sends nothing once the link is cut" do
-    report = submitted("confidential")
-    ReportOwnership.where(report_id: report.id).delete_all
-
-    travel_to(Date.new(2026, 11, 20)) do
-      report.ask_clarification!(analyst, question)
-      expect { perform_enqueued_jobs }.not_to change { ActionMailer::Base.deliveries.size }
-    end
+    expect { perform_enqueued_jobs }.not_to change { ActionMailer::Base.deliveries.size }
   end
 
   it "delivers through the queue and keeps the address out of the test log" do
-    report = submitted("confidential")
     log = Rails.root.join("log/test.log")
     offset = File.size?(log).to_i
 
-    travel_to(Date.new(2026, 11, 20)) do
-      report.ask_clarification!(analyst, question)
-      expect { perform_enqueued_jobs }.to change { ActionMailer::Base.deliveries.size }.by(1)
-    end
+    described_class.digest(user).deliver_later
+    expect { perform_enqueued_jobs }.to change { ActionMailer::Base.deliveries.size }.by(1)
 
     written = File.binread(log, nil, offset).force_encoding(Encoding::UTF_8)
     expect(written).to include("ClarificationMailDeliveryJob")
-    expect(written).not_to include("lea.martin")
+    expect(written).not_to include("lea.martin", user.to_global_id.to_s)
   end
 
   describe "delivery failure" do
@@ -91,7 +50,16 @@ RSpec.describe ClarificationMailer, type: :mailer do
       end
     end
 
+    broken_delivery = Class.new do
+      def initialize(_settings); end
+
+      def deliver!(_mail)
+        raise ArgumentError, "unexpected"
+      end
+    end
+
     around do |example|
+      ActionMailer::Base.add_delivery_method(:broken_delivery, broken_delivery)
       ActionMailer::Base.add_delivery_method(:failing_smtp, failing_smtp)
       described_class.delivery_method = :failing_smtp
       example.run
@@ -100,14 +68,60 @@ RSpec.describe ClarificationMailer, type: :mailer do
     end
 
     it "raises an error that names neither the address nor the user" do
-      report = submitted("confidential")
-      travel_to(Date.new(2026, 11, 20)) { report.ask_clarification!(analyst, question) }
-
-      expect { perform_enqueued_jobs }.to raise_error(ClarificationMailer::DeliveryFailed) { |error|
+      expect { described_class.digest(user).deliver_now }.to raise_error(ApplicationMailer::DeliveryFailed) { |error|
         expect(error.cause).to be_nil
-        expect(error.message).to eq("ClarificationMailer::DeliveryFailed")
+        expect(error.message).to eq("Net::SMTPFatalError")
         expect(error.full_message(highlight: false)).not_to include("lea.martin", "unknown recipient")
       }
+    end
+
+    def notified_report
+      TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml")).publish!
+      analyst = User.create!(email: "chloe.bernard@example.com", role: "analyst")
+      report = Report.start_draft!(mode: "confidential", user: user).first.tap do |report|
+        report.save_draft!(narrative_attributes: { raw_text: "Récit fictif." })
+        report.submit!
+        report.start_analysis!
+        report.ready_for_validation!
+        report.ask_clarification!(analyst, "Question fictive ?")
+      end
+      clear_enqueued_jobs
+      Report.notify_declarants
+      expect(report.reload).to be_declarant_notified
+      report
+    end
+
+    it "retries three times, then hands the user's reports back to the next digest without failing" do
+      report = notified_report
+
+      expect { 3.times { perform_enqueued_jobs } }.not_to raise_error
+      expect(enqueued_jobs).to be_empty
+      expect(performed_jobs.count { |job| job["job_class"] == "ClarificationMailDeliveryJob" }).to eq(3)
+      expect(report.reload).not_to be_declarant_notified
+    end
+
+    it "ends the same way on any other error, so no failed job keeps the user's GlobalID" do
+      described_class.delivery_method = :broken_delivery
+      report = notified_report
+
+      expect { 3.times { perform_enqueued_jobs } }.not_to raise_error
+      expect(enqueued_jobs).to be_empty
+      expect(performed_jobs.count { |job| job["job_class"] == "ClarificationMailDeliveryJob" }).to eq(3)
+      expect(report.reload).not_to be_declarant_notified
+    end
+
+    it "logs only the error class when handing the reports back fails too" do
+      io = StringIO.new
+      logger = NoIpLogging.install(ActiveSupport::Logger.new(io, level: :info))
+      notified_report
+      allow(Report).to receive(:reopen_declarant_notices).and_raise(ActiveRecord::StatementInvalid, "SQL lea.martin")
+
+      Rails.logger.broadcast_to(logger)
+      expect { 3.times { perform_enqueued_jobs } }.not_to raise_error
+      Rails.logger.stop_broadcasting_to(logger)
+
+      expect(io.string).to include("ClarificationMailDeliveryJob: delivery_abandoned failed with ActiveRecord::StatementInvalid")
+      expect(io.string).not_to include("lea.martin", user.to_global_id.to_s)
     end
   end
 end

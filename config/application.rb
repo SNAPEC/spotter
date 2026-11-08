@@ -39,6 +39,10 @@ module Spotter
     # controllers.
     config.active_storage.draw_routes = false
 
+    # A finished job row keeps its arguments, a user's GlobalID among them, and the time it ran: it would
+    # date a mail in the provider's log. Deleted as soon as the job has run, in every environment.
+    config.solid_queue.preserve_finished_jobs = false
+
     # Don't generate system test files.
     config.generators.system_tests = nil
   end
