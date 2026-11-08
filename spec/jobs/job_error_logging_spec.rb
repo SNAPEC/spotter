@@ -13,7 +13,7 @@ RSpec.describe "Job error logging", type: :job do
     Rails.logger.stop_broadcasting_to(logger)
   end
 
-  it "logs a failing job's error without the id its message quotes, but with the job id" do
+  it "logs a failing job's error with neither the id its message quotes nor the job id" do
     stub_const("FailingJob", Class.new(ApplicationJob) {
       def perform(id) = raise(ArgumentError, "Couldn't process Report #{id}")
     })
@@ -21,9 +21,18 @@ RSpec.describe "Job error logging", type: :job do
 
     expect { job.perform_now }.to raise_error(ArgumentError)
 
-    expect(io.string).to include("Error performing FailingJob (Job ID: #{job.job_id})")
+    expect(io.string).to include("Error performing FailingJob (Job ID: [FILTERED])")
     expect(io.string).to include("ArgumentError (Couldn't process Report [FILTERED])")
-    expect(io.string.scan(id)).to be_empty
+    expect(io.string).not_to include(id, job.job_id)
+  end
+
+  it "logs an enqueued job without the report id among its arguments" do
+    stub_const("ReportJob", Class.new(ApplicationJob) { def perform(_id) = nil })
+
+    ReportJob.perform_later(id)
+
+    expect(io.string).to include("Enqueued ReportJob (Job ID: [FILTERED])", 'with arguments: "[FILTERED]"')
+    expect(io.string).not_to include(id)
   end
 
   it "logs a Solid Queue error without the id its message quotes" do
