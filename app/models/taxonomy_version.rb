@@ -7,6 +7,7 @@ class TaxonomyVersion < ApplicationRecord
   validates :number, presence: true, uniqueness: true
 
   before_destroy { throw :abort if published? }
+  before_update :refuse_change_if_published
 
   scope :published, -> { where.not(published_at: nil) }
 
@@ -58,7 +59,13 @@ class TaxonomyVersion < ApplicationRecord
   end
 
   def publish!
-    update!(published_at: Time.current) unless published?
+    return self if published?
+
+    unless fields.exists?
+      errors.add(:base, :no_fields)
+      raise ActiveRecord::RecordInvalid, self
+    end
+    update!(published_at: Time.current)
     self
   end
 
@@ -66,8 +73,11 @@ class TaxonomyVersion < ApplicationRecord
     field_by_code(field_code)&.options.to_a
   end
 
-  # Codes are "<field>.<error>": unknown_field, invalid_option, not_a_list, not_a_string, not_an_integer.
+  # Codes are "<field>.<error>": unknown_field, invalid_option, duplicate_option, not_a_list, not_a_string,
+  # not_an_integer, out_of_range; "answers.not_a_hash" when answers is not a Hash.
   def validate_answers(answers, scope:)
+    return [ "answers.not_a_hash" ] unless answers.is_a?(Hash)
+
     fields_by_code = fields.where(scope: scope.to_s).includes(:options).index_by(&:code)
     answers.flat_map do |code, value|
       field = fields_by_code[code.to_s]
@@ -76,6 +86,14 @@ class TaxonomyVersion < ApplicationRecord
   end
 
   private
+
+  # Only publish! may touch a published version, and only nil -> time.
+  def refuse_change_if_published
+    return if published_at_in_database.nil?
+
+    errors.add(:base, :published_version)
+    throw :abort
+  end
 
   def field_by_code(code)
     fields.includes(:options).find_by(code: code.to_s)
@@ -88,9 +106,13 @@ class TaxonomyVersion < ApplicationRecord
     when "multi"
       if !value.is_a?(Array) then "not_a_list"
       elsif !value.all? { |item| item.is_a?(String) && codes.include?(item) } then "invalid_option"
+      elsif value.uniq.size != value.size then "duplicate_option"
       end
     when "text" then "not_a_string" unless value.is_a?(String)
-    when "integer" then "not_an_integer" unless value.is_a?(Integer)
+    when "integer"
+      if !value.is_a?(Integer) then "not_an_integer"
+      elsif value.negative? then "out_of_range"
+      end
     end
     error ? [ "#{field.code}.#{error}" ] : []
   end

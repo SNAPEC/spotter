@@ -1,5 +1,6 @@
 class TaxonomyOption < ApplicationRecord
   belongs_to :taxonomy_field
+  attr_readonly :taxonomy_field_id
 
   validates :code, :label, presence: true
 

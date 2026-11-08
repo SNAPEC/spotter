@@ -48,6 +48,7 @@ RSpec.describe TaxonomyVersion do
     it "is the latest published version" do
       version.publish!
       draft = described_class.create!(number: 1)
+      draft.fields.create!(code: "d", group: "g", kind: "text", scope: "report", position: 0, label: "D")
       expect(described_class.current).to eq(version)
       draft.publish!
       expect(described_class.current).to eq(draft)
@@ -78,6 +79,25 @@ RSpec.describe TaxonomyVersion do
       expect(version.destroy).to be(false)
       expect(described_class.exists?(version.id)).to be(true)
       expect(field.options.count).to be >= 18
+    end
+
+    it "refuses to unpublish or renumber the version" do
+      expect(version.update(published_at: nil)).to be(false)
+      expect(version.errors.full_messages).to eq([ "Une version publiée de la taxonomie est immuable." ])
+      expect(version.update(number: 5)).to be(false)
+      expect(version.reload.published_at).to be_present
+      expect(version.number).to eq(0)
+    end
+
+    it "refuses to move a field or an option out of its published parent" do
+      draft = described_class.create!(number: 1)
+      draft_field = draft.fields.create!(code: "d", group: "g", kind: "single", scope: "report", position: 0, label: "D")
+      field = version.fields.find_by!(code: "cause")
+      option = field.options.first
+      expect { field.update(taxonomy_version: draft) }.to raise_error(ActiveRecord::ReadonlyAttributeError)
+      expect { option.update(taxonomy_field: draft_field) }.to raise_error(ActiveRecord::ReadonlyAttributeError)
+      expect(field.reload.taxonomy_version).to eq(version)
+      expect(option.reload.taxonomy_field).to eq(field)
     end
 
     it "refuses to add a field" do
@@ -146,6 +166,30 @@ RSpec.describe TaxonomyVersion do
       casualty_field = version.fields.find_by!(scope: "casualty")
       expect(version.validate_answers({ casualty_field.code => "x" }, scope: :report)).to eq([ "#{casualty_field.code}.unknown_field" ])
       expect(version.validate_answers({ "cause" => valid_cause }, scope: :casualty)).to eq([ "cause.unknown_field" ])
+    end
+  end
+
+  describe "#validate_answers with malformed input" do
+    it "refuses anything but a hash" do
+      expect(version.validate_answers(nil, scope: :report)).to eq([ "answers.not_a_hash" ])
+      expect(version.validate_answers("x", scope: :report)).to eq([ "answers.not_a_hash" ])
+    end
+
+    it "flags duplicate values of a multi field and negative integers" do
+      multi = version.fields.find_by!(scope: "report", kind: "multi")
+      code = multi.options.first.code
+      integer = version.fields.find_by!(scope: "report", kind: "integer")
+      expect(version.validate_answers({ multi.code => [ code, code ] }, scope: :report)).to eq([ "#{multi.code}.duplicate_option" ])
+      expect(version.validate_answers({ integer.code => -1 }, scope: :report)).to eq([ "#{integer.code}.out_of_range" ])
+      expect(version.validate_answers({ integer.code => 0 }, scope: :report)).to eq([])
+    end
+  end
+
+  describe "#publish!" do
+    it "refuses a version without fields" do
+      empty = described_class.create!(number: 7)
+      expect { empty.publish! }.to raise_error(ActiveRecord::RecordInvalid, /sans champ/)
+      expect(empty.reload.published_at).to be_nil
     end
   end
 

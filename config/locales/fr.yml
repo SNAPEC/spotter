@@ -1,9 +1,4 @@
 fr:
-  activerecord:
-    errors:
-      messages:
-        record_invalid: "La validation a échoué : %{errors}"
-        published_version: "Une version publiée de la taxonomie est immuable."
   magic_link_mailer:
     sign_in:
       subject: "Votre lien de connexion à Spotter"
@@ -117,6 +112,10 @@ fr:
       too_many_requests: "Trop d’essais. Réessayez dans quelques minutes."
   activerecord:
     errors:
+      messages:
+        record_invalid: "La validation a échoué : %{errors}"
+        no_fields: "Une version sans champ ne peut pas être publiée."
+        published_version: "Une version publiée de la taxonomie est immuable."
       models:
         user:
           attributes:

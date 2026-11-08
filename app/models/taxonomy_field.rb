@@ -3,6 +3,7 @@ class TaxonomyField < ApplicationRecord
   SCOPES = %w[report casualty].freeze
 
   belongs_to :taxonomy_version
+  attr_readonly :taxonomy_version_id
   has_many :options, -> { order(:position) }, class_name: "TaxonomyOption", dependent: :destroy
 
   validates :code, :group, :label, presence: true
