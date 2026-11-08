@@ -91,6 +91,24 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
       expect(anonymous.reload.content_revision).to eq(2)
     end
 
+    it "changes nothing, keeps the analysis and asks for none when the form comes back unchanged" do
+      report.edit_submitted!(edit.merge(casualties_attributes: [ { severity: "minor", answers: { "age_range" => "over_60" } } ]), user: user)
+      perform_enqueued_jobs
+      casualty = report.casualties.sole
+      analysis = Analysis.where(report_id: report.id).sole
+      clear_enqueued_jobs
+
+      [
+        {},
+        { event_type: "incident", narrative_attributes: { raw_text: new_text } },
+        { casualties_attributes: [ { id: casualty.id, severity: "minor", answers: { "age_range" => "over_60" } } ] }
+      ].each { |same| Report.find(report.id).edit_submitted!(same, user: user) }
+
+      expect(report.reload).to have_attributes(content_revision: 1, status: "in_validation")
+      expect(Analysis.where(report_id: report.id)).to eq([ analysis ])
+      expect(enqueued_jobs).to be_empty
+    end
+
     it "accepts only the content of the form" do
       expect { report.edit_submitted!({ status: "validated" }, user: user) }.to raise_error(ArgumentError)
       expect { report.edit_submitted!({ narrative_attributes: { report_id: other.id } }, user: user) }.to raise_error(ArgumentError)
