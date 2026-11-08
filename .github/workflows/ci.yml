@@ -97,7 +97,7 @@ jobs:
           bundler-cache: true
 
       - name: Prepare the database
-        run: bin/rails db:prepare
+        run: bin/rails db:test:prepare
 
       - name: Run the tests
         run: bin/rspec
