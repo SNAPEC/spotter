@@ -1,0 +1,17 @@
+<%# locals: (label:, href: nil, method: nil, variant: :primary, type: "submit", full: false, form: {}, data: {}) %>
+<%# A link with href, a form button with href and method (button_to), a form's own button otherwise. %>
+<% classes = class_names(
+     "inline-flex min-h-touch items-center justify-center rounded-control border-2 px-5 py-2 text-center font-semibold no-underline cursor-pointer",
+     "w-full": full,
+     "border-brand bg-brand text-white hover:border-brand-strong hover:bg-brand-strong": variant == :primary,
+     "border-brand bg-surface text-brand hover:bg-brand-soft": variant == :secondary,
+     "border-danger bg-danger text-white hover:border-danger-strong hover:bg-danger-strong": variant == :danger,
+     "border-transparent px-2 text-brand underline hover:text-brand-strong": variant == :link
+   ) %>
+<% if href && method %>
+  <%= button_to label, href, method: method, class: classes, form: form, form_class: ("w-full" if full), data: data %>
+<% elsif href %>
+  <%= link_to label, href, class: classes, data: data %>
+<% else %>
+  <%= tag.button label, type: type, class: classes, data: data %>
+<% end %>

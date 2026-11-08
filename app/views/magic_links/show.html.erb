@@ -4,5 +4,7 @@
   <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
   <p class="mt-4"><%= t(".body") %></p>
 
-  <%= button_to t(".submit"), magic_link_path(params[:token]), class: "mt-6 rounded px-4 py-2 bg-blue-700 text-white font-medium cursor-pointer" %>
+  <div class="mt-6">
+    <%= render "components/button", label: t(".submit"), href: magic_link_path(params[:token]), method: :post, full: true %>
+  </div>
 </div>

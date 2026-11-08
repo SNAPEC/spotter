@@ -1,0 +1,19 @@
+<%# locals: (form:, attribute:, label:, hint: nil, error: nil, as: :text_field, input: {}) %>
+<% id = form.field_id(attribute)
+   error ||= form.object.errors[attribute].first if form.object.respond_to?(:errors)
+   described_by = [ ("#{id}_hint" if hint), ("#{id}_error" if error) ].compact.join(" ").presence %>
+<div class="space-y-1.5">
+  <%= form.label attribute, label, class: "block font-semibold" %>
+  <% if hint %>
+    <p id="<%= id %>_hint" class="text-muted"><%= hint %></p>
+  <% end %>
+  <% if error %>
+    <p id="<%= id %>_error" class="font-semibold text-danger"><%= error %></p>
+  <% end %>
+  <%= form.public_send(as, attribute, {
+        id: id,
+        class: class_names("block w-full min-h-touch rounded-control border-2 bg-surface px-3 py-2 text-ink",
+          error ? "border-danger" : "border-line-strong"),
+        aria: { describedby: described_by, invalid: (true if error) }
+      }.merge(input)) %>
+</div>

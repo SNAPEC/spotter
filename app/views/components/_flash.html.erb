@@ -1,0 +1,7 @@
+<%# locals: (messages: flash) %>
+<% if messages[:notice] %>
+  <p class="mt-4 rounded-control border-l-4 border-success bg-success-soft px-4 py-3" role="status"><%= messages[:notice] %></p>
+<% end %>
+<% if messages[:alert] %>
+  <p class="mt-4 rounded-control border-l-4 border-danger bg-danger-soft px-4 py-3 font-semibold text-danger-strong" role="alert"><%= messages[:alert] %></p>
+<% end %>

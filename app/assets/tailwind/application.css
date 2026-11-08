@@ -1,1 +1,54 @@
 @import "tailwindcss";
+
+/* Read on a phone, outdoors, sometimes in sunlight: strong contrast, large text and targets, no effects. */
+@theme {
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.55;
+
+  --color-paper: #f7f6f2;
+  --color-surface: #ffffff;
+  --color-ink: #1b1f1c;
+  --color-muted: #4b524d;
+  --color-line: #c9c6bd;
+  --color-line-strong: #6b706b;
+
+  --color-brand: #1d5843;
+  --color-brand-strong: #133d2e;
+  --color-brand-soft: #e3eee8;
+
+  --color-focus: #b4530a;
+
+  --color-success: #1e6b3c;
+  --color-success-soft: #e4f2e8;
+  --color-danger: #a12a1c;
+  --color-danger-strong: #7d1f14;
+  --color-danger-soft: #fbe9e6;
+  --color-warning: #7a4a00;
+  --color-warning-soft: #fcf1d9;
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+
+  /* WCAG 2.5.5: 44 px minimum; a little more for gloves and cold fingers. */
+  --spacing-touch: 3rem;
+  --spacing-gutter: 1rem;
+}
+
+@layer base {
+  html {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+  }
+}

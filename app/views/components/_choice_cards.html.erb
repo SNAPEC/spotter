@@ -1,0 +1,26 @@
+<%# locals: (form:, attribute:, legend:, choices:, multiple: false, selected: nil, hint: nil) %>
+<%# choices: [[value, label, description or nil], ...]. Radios, or check boxes when multiple. %>
+<fieldset class="space-y-2">
+  <legend class="font-semibold"><%= legend %></legend>
+  <% if hint %>
+    <p class="text-muted"><%= hint %></p>
+  <% end %>
+  <div class="grid gap-2 sm:grid-cols-2">
+    <% choices.each do |value, label, description| %>
+      <% input_id = form.field_id(attribute, value) %>
+      <label for="<%= input_id %>" class="flex min-h-touch cursor-pointer items-start gap-3 rounded-card border-2 border-line bg-surface p-4 hover:border-line-strong has-checked:border-brand has-checked:bg-brand-soft">
+        <% if multiple %>
+          <%= form.check_box attribute, { multiple: true, id: input_id, checked: Array(selected).include?(value), class: "mt-0.5 size-5 shrink-0 accent-brand" }, value, nil %>
+        <% else %>
+          <%= form.radio_button attribute, value, id: input_id, checked: selected == value, class: "mt-0.5 size-5 shrink-0 accent-brand" %>
+        <% end %>
+        <span>
+          <span class="block font-semibold"><%= label %></span>
+          <% if description %>
+            <span class="mt-0.5 block text-muted"><%= description %></span>
+          <% end %>
+        </span>
+      </label>
+    <% end %>
+  </div>
+</fieldset>
