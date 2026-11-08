@@ -8,6 +8,8 @@ class ReportOwnership < ApplicationRecord
   validate :cutoff_within_lifecycle
 
   scope :of, ->(user) { where(user_ref: user.id.to_s) }
+  # An overdue link is ignored even before CutOwnershipsJob deletes it.
+  scope :live, -> { where(cutoff_on: Date.current.next_day..) }
 
   def self.cut_due
     where(cutoff_on: ..Date.current).delete_all
@@ -15,6 +17,10 @@ class ReportOwnership < ApplicationRecord
 
   def user=(user)
     self.user_ref = user.id.to_s
+  end
+
+  def user
+    User.find_by(id: user_ref)
   end
 
   private

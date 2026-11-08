@@ -13,13 +13,13 @@ RSpec.describe Report, type: :model do
     end
 
     it "gives its dependent tables UUID ids, which do not reveal creation order" do
-      [ Casualty, Narrative, ReportOwnership ].each do |model|
+      [ Casualty, Narrative, ReportOwnership, Analysis, Clarification ].each do |model|
         expect(model.columns_hash["id"].type).to eq(:uuid)
       end
     end
 
     it "has no timestamps on its dependent tables" do
-      [ Casualty, Narrative, ReportOwnership ].each do |model|
+      [ Casualty, Narrative, ReportOwnership, Analysis, Clarification ].each do |model|
         expect(model.column_names).not_to include("created_at", "updated_at")
       end
     end
@@ -29,7 +29,10 @@ RSpec.describe Report, type: :model do
 
       expect(described_class.column_names.grep(/user/)).to be_empty
       expect(connection.foreign_keys(:reports).map(&:to_table)).not_to include("users")
-      expect(connection.foreign_keys(:report_ownerships).map(&:to_table)).not_to include("users")
+      %i[report_ownerships analyses clarifications].each do |table|
+        expect(connection.foreign_keys(table).map(&:to_table)).not_to include("users")
+        expect(connection.columns(table).map(&:name).grep(/user/)).to eq(table == :report_ownerships ? [ "user_ref" ] : [])
+      end
     end
 
     it "rejects unknown states at the database level" do
@@ -41,8 +44,9 @@ RSpec.describe Report, type: :model do
       end
     end
 
-    it "encrypts the raw narrative, the debriefing answers and the user reference" do
+    it "encrypts the raw narrative, the debriefing answers, the clarifications and the user reference" do
       expect(Narrative.encrypted_attributes).to include(:raw_text, *Narrative::DEBRIEF_FIELDS.map(&:to_sym))
+      expect(Clarification.encrypted_attributes).to include(:body)
       expect(ReportOwnership.encrypted_attributes).to include(:user_ref)
     end
 

@@ -3,6 +3,7 @@ module Report::Lifecycle
 
   OWNERSHIP_DAYS = 60
   DECIDED_STATUSES = %w[validated rejected].freeze
+  UNDER_ANALYSIS_STATUSES = %w[submitted analyzing in_validation].freeze
 
   included do
     Report::STATUSES.each do |status|
@@ -78,7 +79,11 @@ module Report::Lifecycle
   end
 
   def reject!(analyst)
-    decide!(analyst, from: %w[submitted analyzing in_validation], to: "rejected")
+    decide!(analyst, from: UNDER_ANALYSIS_STATUSES, to: "rejected")
+  end
+
+  def under_analysis?
+    UNDER_ANALYSIS_STATUSES.include?(status)
   end
 
   # True only while a lifecycle method changes the report: the ownership cutoff is frozen otherwise.

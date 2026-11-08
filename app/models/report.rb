@@ -19,6 +19,7 @@ class Report < ApplicationRecord
   has_many :casualties, dependent: :destroy
   has_one :report_ownership, dependent: :destroy
   has_many :analyses, dependent: :destroy
+  has_many :clarifications, -> { order(:position) }, dependent: :destroy
 
   accepts_nested_attributes_for :narrative, update_only: true
   accepts_nested_attributes_for :casualties, allow_destroy: true
@@ -65,9 +66,8 @@ class Report < ApplicationRecord
     find_by(tracking_code_digest: digest(normalized, purpose: :tracking_code))
   end
 
-  # An overdue link is ignored even before CutOwnershipsJob deletes it.
   def self.owned_by(user)
-    where(id: ReportOwnership.of(user).where(cutoff_on: Date.current.next_day..).select(:report_id))
+    where(id: ReportOwnership.of(user).live.select(:report_id))
   end
 
   # HMAC rather than a slow hash: tokens and codes are random with high entropy, and a deterministic
@@ -99,12 +99,44 @@ class Report < ApplicationRecord
     draft? && draft_expires_on < Date.current
   end
 
+  # The declarant is told by mail, after the commit, when the report still has a live ownership.
+  def ask_clarification!(analyst, body)
+    raise Report::NotAllowed, "only staff ask for clarification" unless analyst&.staff?
+
+    with_lock do
+      raise Report::InvalidTransition, "a question is already pending" if awaiting_clarification?
+
+      add_clarification!("analyst", body).tap do
+        ActiveRecord.after_all_transactions_commit { ClarificationMailer.requested(self).deliver_later }
+      end
+    end
+  end
+
+  def answer_clarification!(body)
+    with_lock do
+      raise Report::InvalidTransition, "no pending question" unless awaiting_clarification?
+
+      add_clarification!("declarant", body)
+    end
+  end
+
+  def awaiting_clarification?
+    clarifications.reorder(position: :desc).pick(:author) == "analyst"
+  end
+
   # The draft stays open through its expiry day: the link goes the day after, with the draft itself.
   def draft_cutoff_on
     draft_expires_on + 1
   end
 
   private
+    # Called under the row lock, which also makes the position sequential.
+    def add_clarification!(author, body)
+      raise Report::InvalidTransition, "cannot exchange on a #{status} report" unless under_analysis?
+
+      clarifications.create!(author: author, body: body, position: clarifications.maximum(:position).to_i + 1)
+    end
+
     def free_text_codes
       taxonomy_version.fields.where(kind: "text").pluck(:code)
     end
