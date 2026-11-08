@@ -19,6 +19,7 @@ RSpec.describe Report, "taking in charge", type: :model do
   describe "#take_charge!" do
     it "marks the report as taken in charge and records who did it, once" do
       expect(report).not_to be_taken_in_charge
+      expect(report.editable_until).to be_present
 
       report.take_charge!(analyst)
       report.take_charge!(User.create!(email: "marc.petit@example.com", role: "admin"))
@@ -71,6 +72,7 @@ RSpec.describe Report, "taking in charge", type: :model do
     { validate!: "in_validation", reject!: "submitted" }.each do |decision, status|
       it "take the report in charge with #{decision}, and keep it so after the purge" do
         Report::Analyzer.new.call(report, revision: report.content_revision) if status == "in_validation"
+        expect(report.reload.editable_until).to be_present
         report.public_send(decision, analyst)
 
         expect(report.reload).to be_taken_in_charge
