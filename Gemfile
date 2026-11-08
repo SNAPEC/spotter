@@ -62,3 +62,11 @@ group :development do
 end
 
 gem "rspec-rails", "~> 8.1", groups: [ :development, :test ]
+
+# Passkeys (WebAuthn) for staff second factor
+gem "webauthn", "~> 3.4"
+
+group :test do
+  gem "capybara"
+  gem "selenium-webdriver"
+end

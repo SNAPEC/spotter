@@ -8,9 +8,22 @@ Rails.application.routes.draw do
   resource :session, only: :destroy
   delete "sessions" => "sessions#destroy_all", as: :sessions
 
+  resource :passkey_registration, only: %i[new create] do
+    post :options
+  end
+  resource :passkey_session, only: %i[new create] do
+    post :options
+  end
+  resource :recovery_code, only: %i[new create]
+
   root "declarant/home#show"
   get "analyst" => "analyst/home#show", as: :analyst_root
   get "admin" => "admin/home#show", as: :admin_root
+  namespace :admin do
+    resources :users, only: [] do
+      resource :passkey_reset, only: :create
+    end
+  end
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.

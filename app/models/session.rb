@@ -17,4 +17,55 @@ class Session < ApplicationRecord
   def expired?
     expires_on < Date.current
   end
+
+  def may_register_passkey?
+    passkey_verified? || user.passkeys.none?
+  end
+
+  def needs_enrollment_code?
+    user.passkeys.none?
+  end
+
+  def passkey_registration_options!
+    Passkey.registration_options_for(user).tap { |options| update_column(:webauthn_challenge, options.challenge) }
+  end
+
+  def passkey_authentication_options!
+    Passkey.authentication_options_for(user).tap { |options| update_column(:webauthn_challenge, options.challenge) }
+  end
+
+  # The first passkey needs the enrollment code an admin handed over: the magic link alone is not enough.
+  # Returns the recovery codes when the user had none left, else an empty array.
+  def register_passkey!(credential:, nickname: nil, enrollment_code: nil)
+    raise Passkey::InvalidCredential, "session not verified" unless may_register_passkey?
+    challenge = consume_webauthn_challenge!
+
+    transaction do
+      if needs_enrollment_code? && !user.consume_enrollment_code!(enrollment_code)
+        raise Passkey::InvalidCredential, "invalid enrollment code"
+      end
+
+      Passkey.register!(user: user, credential: credential, challenge: challenge, nickname: nickname)
+      update!(passkey_verified: true)
+      user.recovery_codes.exists? ? [] : user.generate_recovery_codes!
+    end
+  end
+
+  def verify_passkey(credential:)
+    challenge = consume_webauthn_challenge!
+    Passkey.authenticate(user: user, credential: credential, challenge: challenge).present? && update!(passkey_verified: true)
+  end
+
+  def verify_recovery_code(code)
+    user.use_recovery_code!(code) && update!(passkey_verified: true)
+  end
+
+  private
+    # Read and cleared under a row lock, in its own transaction: a challenge serves once, even if the
+    # ceremony then fails.
+    def consume_webauthn_challenge!
+      with_lock do
+        webauthn_challenge.tap { update_column(:webauthn_challenge, nil) }
+      end
+    end
 end

@@ -1,0 +1,14 @@
+<% content_for :title, t(".title") %>
+
+<div class="mx-auto w-full max-w-md">
+  <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
+  <p class="mt-4"><%= t(".body") %></p>
+
+  <ul class="mt-6 grid grid-cols-2 gap-2 font-mono">
+    <% @recovery_codes.each do |code| %>
+      <li><code><%= code %></code></li>
+    <% end %>
+  </ul>
+
+  <%= link_to t(".continue"), @continue_url, class: "mt-6 inline-block rounded px-4 py-2 bg-blue-700 text-white font-medium" %>
+</div>

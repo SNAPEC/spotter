@@ -3,6 +3,7 @@ require "rails_helper"
 RSpec.describe "Authorization", type: :request do
   def sign_in(user)
     post magic_link_path(user.magic_link_token)
+    post recovery_code_path, params: { code: user.generate_recovery_codes!.first } if user.staff?
   end
 
   def user_with(role)
@@ -20,7 +21,7 @@ RSpec.describe "Authorization", type: :request do
     get "/analyst"
     expect(response).to redirect_to(login_path)
 
-    sign_in(user_with("analyst"))
+    post magic_link_path(user_with("analyst").magic_link_token)
 
     expect(response).to redirect_to("http://www.example.com/analyst")
   end
