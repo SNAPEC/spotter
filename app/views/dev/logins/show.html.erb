@@ -1,0 +1,24 @@
+<% content_for :title, t(".title") %>
+<div class="w-full">
+  <h1 class="text-2xl font-semibold"><%= t(".title") %></h1>
+  <p class="mt-2"><%= t(".intro") %></p>
+
+  <table class="mt-4 w-full text-left">
+    <thead>
+      <tr>
+        <th class="py-2"><%= t(".email") %></th>
+        <th class="py-2"><%= t(".role") %></th>
+        <th class="py-2"><span class="sr-only"><%= t(".actions") %></span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @users.each do |user| %>
+        <tr class="border-t border-gray-200">
+          <td class="py-2"><%= user.email %></td>
+          <td class="py-2"><%= t("roles.#{user.role}") %></td>
+          <td class="py-2"><%= button_to t(".sign_in"), dev_login_path(user_id: user.id), form: { data: { turbo: false } }, class: "underline cursor-pointer" %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
