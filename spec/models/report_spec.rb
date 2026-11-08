@@ -116,6 +116,21 @@ RSpec.describe Report, type: :model do
       expect(described_class.owned_by(user)).to contain_exactly(mine)
     end
 
+    it "ignores an overdue link even before the daily job has cut it" do
+      report, = described_class.start_draft!(mode: "confidential", user: user)
+      travel_to(Date.new(2026, 11, 17)) { report.submit! }
+
+      travel_to(Date.new(2027, 1, 15)) { expect(described_class.owned_by(user)).to contain_exactly(report) }
+      travel_to(Date.new(2027, 1, 16)) { expect(described_class.owned_by(user)).to be_empty }
+      expect(ReportOwnership.where(report_id: report.id)).to exist
+    end
+
+    it "ignores an expired confidential draft before the daily jobs" do
+      report, = described_class.start_draft!(mode: "confidential", user: user)
+
+      travel_to(report.draft_expires_on + 1) { expect(described_class.owned_by(user)).to be_empty }
+    end
+
     it "finds the submitted report while the link exists, and no longer after the cutoff" do
       report, = described_class.start_draft!(mode: "confidential", user: user)
       travel_to(Date.new(2026, 11, 17)) { report.submit! }

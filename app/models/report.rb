@@ -63,8 +63,9 @@ class Report < ApplicationRecord
     find_by(tracking_code_digest: digest(normalized, purpose: :tracking_code))
   end
 
+  # An overdue link is ignored even before CutOwnershipsJob deletes it.
   def self.owned_by(user)
-    where(id: ReportOwnership.of(user).select(:report_id))
+    where(id: ReportOwnership.of(user).where(cutoff_on: Date.current.next_day..).select(:report_id))
   end
 
   # HMAC rather than a slow hash: tokens and codes are random with high entropy, and a deterministic
