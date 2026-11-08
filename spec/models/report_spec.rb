@@ -193,6 +193,22 @@ RSpec.describe Report, type: :model do
       expect { ReportOwnership.find_by(report_id: report.id).update!(cutoff_on: Date.current + 3650) }.to raise_error(ActiveRecord::RecordInvalid)
       expect(report.report_ownership.reload.cutoff_on).to eq(Date.current + 60)
     end
+
+    it "only follows the draft expiry while a draft" do
+      expect { report.report_ownership.update!(cutoff_on: report.draft_expires_on) }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    it "is frozen once submitted, even to a value within 60 days" do
+      travel_to(Date.new(2026, 11, 17)) { report.submit! }
+
+      travel_to(Date.new(2026, 11, 20)) do
+        [ report.report_ownership, ReportOwnership.find_by(report_id: report.id) ].each do |ownership|
+          expect { ownership.update!(cutoff_on: Date.current + 30) }.to raise_error(ActiveRecord::RecordInvalid)
+          expect { ownership.reload.update!(cutoff_on: Date.current + 60) }.to raise_error(ActiveRecord::RecordInvalid)
+        end
+      end
+      expect(ReportOwnership.where(report_id: report.id).pick(:cutoff_on)).to eq(Date.new(2027, 1, 16))
+    end
   end
 
   describe "#save_draft!" do

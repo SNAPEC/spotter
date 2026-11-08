@@ -53,8 +53,8 @@ module Report::Lifecycle
           draft_token_digest: nil,
           tracking_code_digest: code && Report.digest(RecoveryCode.normalize(code), purpose: :tracking_code)
         )
+        report_ownership&.update!(cutoff_on: Date.current + OWNERSHIP_DAYS)
       end
-      report_ownership&.update!(cutoff_on: Date.current + OWNERSHIP_DAYS)
       code
     end
   end
@@ -76,6 +76,11 @@ module Report::Lifecycle
     decide!(analyst, from: %w[submitted analyzing in_validation], to: "rejected")
   end
 
+  # True only while a lifecycle method changes the report: the ownership cutoff is frozen otherwise.
+  def lifecycle_transition?
+    @lifecycle_transition == true
+  end
+
   private
     def through_lifecycle
       @lifecycle_transition = true
@@ -85,7 +90,7 @@ module Report::Lifecycle
     end
 
     def status_changes_through_lifecycle
-      errors.add(:status, :invalid) if will_save_change_to_status? && !@lifecycle_transition
+      errors.add(:status, :invalid) if will_save_change_to_status? && !lifecycle_transition?
     end
 
     def check_draft_keys!(keys, allowed)

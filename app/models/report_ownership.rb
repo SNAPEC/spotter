@@ -18,11 +18,15 @@ class ReportOwnership < ApplicationRecord
   end
 
   private
-    # Only the lifecycle sets the cutoff; this bounds any other write to what it could have set.
+    # Deletion dates are the same for everyone: a draft's link follows its expiry, and once submitted
+    # the cutoff set by submit! is frozen.
     def cutoff_within_lifecycle
       return if cutoff_on.nil? || report.nil?
 
-      limit = report.draft? ? report.draft_cutoff_on : Date.current + Report::Lifecycle::OWNERSHIP_DAYS
-      errors.add(:cutoff_on, :invalid) if cutoff_on > limit
+      if report.draft?
+        errors.add(:cutoff_on, :invalid) unless cutoff_on == report.draft_cutoff_on
+      elsif (new_record? || will_save_change_to_cutoff_on?) && !report.lifecycle_transition?
+        errors.add(:cutoff_on, :invalid)
+      end
     end
 end
