@@ -5,6 +5,7 @@ class RemoveViewFromAccessLogActions < ActiveRecord::Migration[8.1]
     replace_action_check(AccessLog::ACTIONS)
   end
 
+  # The deleted view rows are not restored.
   def down
     replace_action_check(%w[view take_charge ask_clarification validate reject])
   end
