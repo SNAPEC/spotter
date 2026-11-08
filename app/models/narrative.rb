@@ -7,7 +7,17 @@ class Narrative < ApplicationRecord
 
   encrypts :raw_text, *DEBRIEF_FIELDS
 
+  validate :no_raw_text_once_decided
+
   def purge_raw!
     update!(raw_text: nil, **DEBRIEF_FIELDS.index_with(nil))
   end
+
+  private
+    # Checked against the stored status: a stale copy of the report must not let raw text back in.
+    def no_raw_text_once_decided
+      return if [ "raw_text", *DEBRIEF_FIELDS ].all? { |field| self[field].nil? }
+
+      errors.add(:raw_text, :invalid) if Report.decided.exists?(report_id)
+    end
 end

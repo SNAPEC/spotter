@@ -114,6 +114,36 @@ RSpec.describe Report::Lifecycle, type: :model do
     end
   end
 
+  describe "decided report" do
+    %i[validate! reject!].each do |decision|
+      it "refuses raw text, debriefing answers and casualty changes after #{decision}" do
+        report = in_validation
+        report.public_send(decision, analyst)
+        narrative = Narrative.find_by(report_id: report.id)
+        casualty = report.casualties.sole
+
+        expect { narrative.update!(raw_text: "Nouveau récit fictif") }.to raise_error(ActiveRecord::RecordInvalid)
+        expect { narrative.update!(debrief_message: "Message fictif") }.to raise_error(ActiveRecord::RecordInvalid)
+        expect { report.update!(narrative_attributes: { raw_text: "Récit fictif réinjecté" }) }.to raise_error(ActiveRecord::RecordInvalid)
+        expect { report.casualties.create!(severity: "minor") }.to raise_error(ActiveRecord::RecordInvalid)
+        expect { casualty.update!(severity: "fatal") }.to raise_error(ActiveRecord::RecordInvalid)
+        expect { casualty.destroy! }.to raise_error(ActiveRecord::RecordNotDestroyed)
+        expect(Narrative.where(report_id: report.id).pick(:raw_text, :debrief_message)).to eq([ nil, nil ])
+        expect(Casualty.where(report_id: report.id).pluck(:severity)).to eq([ "minor" ])
+      end
+    end
+
+    it "refuses a status change outside the lifecycle" do
+      report = in_validation
+
+      expect { report.update!(status: "validated") }.to raise_error(ActiveRecord::RecordInvalid)
+      expect { Report.create!(mode: "anonymous", status: "submitted", taxonomy_version: TaxonomyVersion.current) }
+        .to raise_error(ActiveRecord::RecordInvalid)
+      expect(Report.find(report.id)).to be_in_validation
+      expect(Narrative.find_by(report_id: report.id).raw_text).to eq("Récit fictif.")
+    end
+  end
+
   describe "purge at the end of the analysis" do
     %i[validate! reject!].each do |decision|
       %w[confidential anonymous].each do |mode|

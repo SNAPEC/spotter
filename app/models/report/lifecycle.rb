@@ -2,11 +2,15 @@ module Report::Lifecycle
   extend ActiveSupport::Concern
 
   OWNERSHIP_DAYS = 60
+  DECIDED_STATUSES = %w[validated rejected].freeze
 
   included do
     Report::STATUSES.each do |status|
       define_method(:"#{status}?") { self.status == status }
     end
+
+    scope :decided, -> { where(status: DECIDED_STATUSES) }
+    validate :status_changes_through_lifecycle
   end
 
   # Only the content of the form: state, dates and digests stay in the lifecycle's hands.
@@ -37,13 +41,15 @@ module Report::Lifecycle
       raise Report::InvalidTransition, "authorship link already cut" if confidential? && report_ownership.nil?
 
       code = RecoveryCode.generate_one if anonymous?
-      update!(
-        status: "submitted",
-        submitted_on: Date.current.beginning_of_month,
-        draft_expires_on: nil,
-        draft_token_digest: nil,
-        tracking_code_digest: code && Report.digest(RecoveryCode.normalize(code), purpose: :tracking_code)
-      )
+      through_lifecycle do
+        update!(
+          status: "submitted",
+          submitted_on: Date.current.beginning_of_month,
+          draft_expires_on: nil,
+          draft_token_digest: nil,
+          tracking_code_digest: code && Report.digest(RecoveryCode.normalize(code), purpose: :tracking_code)
+        )
+      end
       report_ownership&.update!(cutoff_on: Date.current + OWNERSHIP_DAYS)
       code
     end
@@ -66,6 +72,17 @@ module Report::Lifecycle
   end
 
   private
+    def through_lifecycle
+      @lifecycle_transition = true
+      yield
+    ensure
+      @lifecycle_transition = false
+    end
+
+    def status_changes_through_lifecycle
+      errors.add(:status, :invalid) if will_save_change_to_status? && !@lifecycle_transition
+    end
+
     def check_draft_keys!(keys, allowed)
       unexpected = keys - allowed
       raise ArgumentError, "not draft content: #{unexpected.join(", ")}" if unexpected.any?
@@ -84,7 +101,7 @@ module Report::Lifecycle
         raise Report::InvalidTransition, "cannot go from #{status} to #{to}" unless Array(from).include?(status)
 
         yield if block_given?
-        update!(status: to)
+        through_lifecycle { update!(status: to) }
       end
     end
 

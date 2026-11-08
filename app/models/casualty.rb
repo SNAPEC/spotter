@@ -4,8 +4,26 @@ class Casualty < ApplicationRecord
   normalizes :severity, with: ->(value) { value.presence }
 
   validate :severity_is_an_option, :answers_fit_taxonomy, if: -> { report&.taxonomy_version }
+  validate :report_still_open
+  before_destroy :refuse_once_decided
 
   private
+    # Checked against the stored status, like Narrative: a decided report is read-only.
+    def report_decided?
+      Report.decided.exists?(report_id)
+    end
+
+    def report_still_open
+      errors.add(:report, :invalid) if report_decided?
+    end
+
+    def refuse_once_decided
+      return unless report_decided?
+
+      errors.add(:report, :invalid)
+      throw :abort
+    end
+
     def taxonomy_version
       report.taxonomy_version
     end
