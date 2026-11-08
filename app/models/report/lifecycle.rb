@@ -187,6 +187,9 @@ module Report::Lifecycle
       narrative&.purge_raw!
       clarifications.destroy_all
       analyses.each(&:strip_raw_excerpts!)
+      # A row's xmin is the id of the transaction that last wrote it, and ids grow with time: left as is,
+      # a casualty would date the declarant's last entry. The no-op write stamps it with the decision's.
+      casualties.update_all("severity = severity")
       report_ownership&.destroy!
       assign_attributes(tracking_code_digest: nil, draft_token_digest: nil, declarant_notified: false)
     end
