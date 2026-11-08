@@ -52,11 +52,15 @@ RSpec.describe AnalyzeReportJob, type: :job do
     include ActiveSupport::Testing::TimeHelpers
 
     let(:calls) { [] }
+    let(:reported) { [] }
+    let(:subscriber) { Struct.new(:errors) { def report(error, handled:, **) = errors << [ error.message, handled ] }.new(reported) }
 
     around do |example|
       original = Rails.configuration.x.llm_extractor
+      Rails.error.subscribe(subscriber)
       example.run
     ensure
+      Rails.error.unsubscribe(subscriber)
       Rails.configuration.x.llm_extractor = original
     end
 
@@ -95,6 +99,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
       described_class.perform_now(report, report.content_revision)
 
       expect(calls.size).to eq(7)
+      expect(reported).to eq([ [ "Report::Analyzer::ExtractionFailed", true ] ])
       # Retries carry up to 15 % jitter.
       expect(calls.each_cons(2).map { |earlier, later| later - earlier }).to all(be_between(10.minutes, 12.minutes))
       expect(calls.last - calls.first).to be_between(1.hour, 70.minutes)
@@ -108,6 +113,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
       expect { drain }.not_to raise_error
 
       expect(calls.size).to eq(3)
+      expect(reported).to eq([ [ "Report::Analyzer::InvalidProposals", true ] ])
       expect(calls.last - calls.first).to be < 10.minutes
       expect_handed_over
     end
@@ -121,6 +127,7 @@ RSpec.describe AnalyzeReportJob, type: :job do
       expect { drain }.not_to raise_error
       expect(Analysis.where(report_id: report.id)).to be_empty
       expect(report.reload).to be_analyzing
+      expect(reported).to eq([ [ "RuntimeError", true ], [ "record_failure: RuntimeError", true ] ])
 
       use_extractor
       Report.requeue_stalled_analyses
@@ -129,6 +136,16 @@ RSpec.describe AnalyzeReportJob, type: :job do
       expect(Analysis.where(report_id: report.id).sole.status).to eq("proposed")
       expect(report.reload).to be_in_validation
     end
+  end
+
+  # Solid Queue blocks a second job with the same key until the first one ends.
+  it "runs one job per report at a time" do
+    other, = Report.start_draft!(mode: "anonymous")
+    job = described_class.new(report, 0)
+
+    expect(described_class.concurrency_limit).to eq(1)
+    expect(job.concurrency_key).to eq(described_class.new(report, 1).concurrency_key)
+    expect(job.concurrency_key).not_to eq(described_class.new(other, 0).concurrency_key)
   end
 
   it "is discarded when the report no longer exists" do
