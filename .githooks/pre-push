@@ -5,7 +5,7 @@
 set -uo pipefail
 
 root=$(git rev-parse --show-toplevel)
-cd "$root"
+cd "$root" || exit 1
 
 if [ -n "${PREPUSH_SKIP_REASON:-}" ]; then
   echo "$(date -Iseconds) $(git rev-parse --abbrev-ref HEAD) $PREPUSH_SKIP_REASON" >> "$(git rev-parse --git-dir)/prepush-skips.log"
@@ -61,7 +61,7 @@ echo "pre-push: $(wc -l <<<"$changed" | tr -d ' ') file(s) changed"
 dirty=$(git status --porcelain --untracked-files=all | grep -E '^( M|M |MM|A |\?\? )' | grep -Ev '^\?\? (tmp|log|storage|coverage)/' || true)
 if [ -n "$dirty" ]; then
   echo "  FAIL  clean-tree     uncommitted or untracked files:"
-  echo "$dirty" | sed 's/^/        /'
+  sed 's/^/        /' <<<"$dirty"
   failed=1
 fi
 
