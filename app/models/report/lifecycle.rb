@@ -32,7 +32,8 @@ module Report::Lifecycle
     raise
   end
 
-  # The declarant may correct a submitted report until staff take it in charge, for OWNERSHIP_DAYS at most. The analyses go: their
+  # The declarant may correct a submitted report until staff take it in charge, and while the authorship
+  # link would still be live (editable_until is the day before its cutoff), in both modes. The analyses go: their
   # excerpts quote the old text. The new revision makes a run still working on the old text write
   # nothing. Ownership cutoff, tracking code and submission month stay as submit! set them.
   # Authorisation comes before any state check, so a stranger learns nothing about the report.
@@ -74,7 +75,7 @@ module Report::Lifecycle
         update!(
           status: "submitted",
           submitted_on: Date.current.beginning_of_month,
-          editable_until: Date.current + OWNERSHIP_DAYS,
+          editable_until: Date.current + OWNERSHIP_DAYS - 1,
           draft_expires_on: nil,
           draft_token_digest: nil,
           tracking_code_digest: code && Report.digest(RecoveryCode.normalize(code), purpose: :tracking_code)
