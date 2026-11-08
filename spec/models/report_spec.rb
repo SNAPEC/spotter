@@ -24,6 +24,21 @@ RSpec.describe Report, type: :model do
       end
     end
 
+    it "refuses an editing window on a report the declarant can no longer edit" do
+      report, = described_class.start_draft!(mode: "anonymous")
+      report.submit!
+      analyst = User.create!(email: "chloe.bernard@example.com", role: "analyst")
+
+      expect { described_class.transaction(requires_new: true) { report.update_column(:taken_in_charge, true) } }
+        .to raise_error(ActiveRecord::StatementInvalid, /reports_editable_until_check/)
+      report.reject!(analyst)
+      expect { described_class.transaction(requires_new: true) { report.update_column(:editable_until, Date.current) } }
+        .to raise_error(ActiveRecord::StatementInvalid, /reports_editable_until_check/)
+      draft, = described_class.start_draft!(mode: "anonymous")
+      expect { described_class.transaction(requires_new: true) { draft.update_column(:editable_until, Date.current) } }
+        .to raise_error(ActiveRecord::StatementInvalid, /reports_editable_until_check/)
+    end
+
     it "has no column nor foreign key pointing to users" do
       connection = described_class.connection
 
