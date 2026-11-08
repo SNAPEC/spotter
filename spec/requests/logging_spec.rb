@@ -87,4 +87,13 @@ RSpec.describe "Request logging", type: :request do
     expect(io.string).to include("ArgumentError (Couldn't process Report [FILTERED])")
     expect(io.string).not_to include(id)
   end
+
+  it "logs no blob key when storing a file" do
+    service, key = ActiveStorage::Blob.service, ActiveStorage::Blob.generate_unique_secure_token
+
+    service.upload(key, StringIO.new("Fichier fictif"))
+    service.delete(key)
+
+    expect(io.string).not_to include(key)
+  end
 end

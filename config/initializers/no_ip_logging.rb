@@ -34,3 +34,7 @@ end
 # Every framework logs through Rails.logger: Action Pack, Active Job, Solid Queue.
 Rails.logger.broadcasts.each { |logger| NoIpLogging.install(logger) }
 Rails::Rack::Logger.prepend(NoIpLogging::RequestLine)
+
+# A blob key gives access to the file in the bucket: Active Storage logs nothing.
+require "active_storage/log_subscriber"
+ActiveStorage::LogSubscriber.detach_from(:active_storage)
