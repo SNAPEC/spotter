@@ -5,4 +5,9 @@ class ClarificationMailDeliveryJob < ActionMailer::MailDeliveryJob
 
   queue_as :default
   discard_on ActiveJob::DeserializationError
+  # After the last attempt the user's reports wait for the next digest. Handled here, the error leaves no
+  # failed execution behind, which would keep the user's GlobalID.
+  retry_on "ClarificationMailer::DeliveryFailed", wait: :polynomially_longer, attempts: 3 do |job, _error|
+    Report.reopen_declarant_notices(job.arguments.last[:args].first)
+  end
 end

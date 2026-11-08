@@ -139,6 +139,11 @@ class Report < ApplicationRecord
     raise Report::DigestIncomplete if unsent.any?
   end
 
+  # Called when a digest could not be delivered: the user's reports wait for the next run.
+  def self.reopen_declarant_notices(user)
+    where(id: ReportOwnership.live.of(user).select(:report_id), declarant_notified: true).update_all(declarant_notified: false)
+  end
+
   def mark_declarant_notified
     with_lock do
       update_column(:declarant_notified, true) if under_analysis? && awaiting_clarification?
