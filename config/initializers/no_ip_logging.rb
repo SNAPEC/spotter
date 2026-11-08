@@ -3,11 +3,21 @@
 Rails.application.config.log_tags = [ :request_id ]
 
 module NoIpLogging
-  UUID = /\h{8}-\h{4}-\h{4}-\h{4}-\h{12}/i
+  # Job ids are random and point to no record: kept so a job can be followed from enqueue to perform.
+  UUID = /(?<!Job ID: |active_job_id: ")\h{8}-\h{4}-\h{4}-\h{4}-\h{12}/i
   FILTERED = "[FILTERED]"
 
-  def self.mask(text)
-    text.is_a?(String) ? text.gsub(UUID, FILTERED) : text
+  # Masks every message before the tags are added, so the request id tag stays.
+  module Formatter
+    def call(severity, time, progname, msg)
+      super(severity, time, progname, msg.is_a?(String) ? msg.gsub(UUID, FILTERED) : msg)
+    end
+  end
+
+  def self.install(logger)
+    logger.formatter ||= ActiveSupport::Logger::SimpleFormatter.new
+    logger.formatter.extend(Formatter)
+    logger
   end
 
   module RequestLine
@@ -16,42 +26,11 @@ module NoIpLogging
     # Overrides a private Rails 8.1 method: re-check it when upgrading Rails.
     def started_request_message(request)
       path = request.filtered_path.sub(%r{\A/login/[^/?]+}, "/login/#{FILTERED}")
-      format('Started %s "%s" at %s', request.raw_request_method, NoIpLogging.mask(path), Time.now)
-    end
-  end
-
-  # An unrescued exception logs its message, which may quote a record id.
-  module ExceptionMessage
-    private
-
-    # Overrides a private Rails 8.1 method: re-check it when upgrading Rails.
-    def compose_exception_message(wrapper)
-      super.map { |line| NoIpLogging.mask(line) }
-    end
-  end
-
-  # Every line of a log subscriber, an error message included. Log tags, such as the job id, are kept.
-  module SubscriberLines
-    %w[debug info warn error fatal unknown].each do |level|
-      define_method(level) do |progname = nil, &block|
-        if block
-          super(progname) { NoIpLogging.mask(block.call) }
-        else
-          super(NoIpLogging.mask(progname))
-        end
-      end
+      format('Started %s "%s" at %s', request.raw_request_method, path, Time.now)
     end
   end
 end
 
+# Every framework logs through Rails.logger: Action Pack, Active Job, Solid Queue.
+Rails.logger.broadcasts.each { |logger| NoIpLogging.install(logger) }
 Rails::Rack::Logger.prepend(NoIpLogging::RequestLine)
-ActionDispatch::DebugExceptions.prepend(NoIpLogging::ExceptionMessage)
-ActiveSupport.on_load(:active_job) { ActiveJob::LogSubscriber.prepend(NoIpLogging::SubscriberLines) }
-ActiveSupport.on_load(:solid_queue) { SolidQueue::LogSubscriber.prepend(NoIpLogging::SubscriberLines) }
-
-# The "Redirected to" line: a location holding an id is logged as [FILTERED] as a whole.
-Rails.application.config.filter_redirect << NoIpLogging::UUID
-
-# A 404 would log its exception message, "No route matches" or "Couldn't find Report", path or id included.
-# The "Completed 404" line stays.
-Rails.application.config.action_dispatch.log_rescued_responses = false
