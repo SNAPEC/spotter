@@ -75,6 +75,14 @@ fr:
         actions: "Actions"
         reset: "Réinitialiser les passkeys"
         reset_confirm: "Supprimer ses passkeys et ses codes de secours, et le déconnecter partout ? Un code d’enrôlement vous sera remis."
+        deactivate: "Désactiver"
+        deactivate_confirm: "Désactiver ce compte ? Il sera déconnecté partout, ses passkeys et ses codes de secours seront supprimés, et il ne pourra plus se connecter. Cette action est irréversible."
+        deactivated: "Désactivé"
+    deactivations:
+      create:
+        done: "Le compte de %{email} est désactivé."
+        too_few_admins: "Désactivation impossible : il doit rester au moins %{count} administrateurs actifs."
+        not_allowed: "Vous ne pouvez pas désactiver ce compte."
     passkey_resets:
       create:
         title: "Code d’enrôlement"

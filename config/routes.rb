@@ -22,6 +22,7 @@ Rails.application.routes.draw do
   namespace :admin do
     resources :users, only: [] do
       resource :passkey_reset, only: :create
+      resource :deactivation, only: :create
     end
   end
 
