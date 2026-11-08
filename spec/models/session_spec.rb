@@ -26,11 +26,11 @@ RSpec.describe Session, type: :model do
       expect(Session.resume(session.id)).to eq(session)
     end
 
-    it "destroys and refuses an expired session" do
+    it "refuses an expired session but leaves its deletion to the purge job" do
       session = user.sessions.create!(expires_on: Date.yesterday)
 
       expect(Session.resume(session.id)).to be_nil
-      expect(Session.exists?(session.id)).to be(false)
+      expect(Session.exists?(session.id)).to be(true)
     end
 
     it "returns nil for an unknown id" do

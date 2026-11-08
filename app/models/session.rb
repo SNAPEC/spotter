@@ -5,12 +5,9 @@ class Session < ApplicationRecord
 
   scope :expired, -> { where(expires_on: ...Date.current) }
 
+  # Deletion belongs to PurgeExpiredSessionsJob: a GET never writes.
   def self.resume(id)
-    session = find_by(id: id)
-    return session unless session&.expired?
-
-    session.destroy
-    nil
+    find_by(id: id).then { |session| session unless session&.expired? }
   end
 
   def self.purge_expired

@@ -26,7 +26,9 @@ module Authentication
     end
 
     def find_session_by_cookie
-      Session.resume(cookies.signed[:session_id]) if cookies.signed[:session_id]
+      return unless (id = cookies.signed[:session_id])
+
+      Session.resume(id).tap { |session| cookies.delete(:session_id) unless session }
     end
 
     def request_authentication

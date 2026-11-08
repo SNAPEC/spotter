@@ -36,14 +36,26 @@ RSpec.describe "Sessions", type: :request do
     expect(user.sessions.count).to eq(1)
   end
 
-  it "refuses and destroys an expired session even if the cookie is still sent" do
+  it "treats an expired session as signed out, clears its cookie and keeps the row for the purge job" do
     sign_in(user)
     user.sessions.sole.update!(expires_on: Date.yesterday)
 
     expect { delete sessions_path }.not_to change { user.reload.login_token_version }
     expect(response).to redirect_to(login_path)
     expect(flash[:notice]).to be_nil
-    expect(user.sessions.reload).to be_empty
+    expect(session_cookie_header).to include("expires=Thu, 01 Jan 1970")
+    expect(user.sessions.count).to eq(1)
+  end
+
+  it "does not write on a GET that sees an expired session" do
+    sign_in(user)
+    user.sessions.sole.update!(expires_on: Date.yesterday)
+
+    get root_path
+
+    expect(response.body).not_to include("Se déconnecter")
+    expect(session_cookie_header).to include("expires=Thu, 01 Jan 1970")
+    expect(user.sessions.count).to eq(1)
   end
 
   it "signs out of the current session only" do
