@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe User, "purge of unused accounts", type: :model do
-  let(:user) { User.create!(email: "moniteur@example.test").tap { |user| user.update_columns(purge_on: Date.current.prev_month.end_of_month) } }
+  let!(:user) { User.create!(email: "moniteur@example.test").tap { |user| user.update_columns(purge_on: Date.current.beginning_of_quarter.prev_day) } }
 
   it "checks again under the lock: a sign-in since the account was loaded keeps it" do
     stale = User.purge_due.find(user.id)
@@ -21,7 +21,19 @@ RSpec.describe User, "purge of unused accounts", type: :model do
     expect(User.exists?(user.id)).to be(true)
   end
 
-  it "keeps every date at the end of a month, in the database too" do
-    expect { user.update_columns(purge_on: Date.new(2027, 3, 15)) }.to raise_error(ActiveRecord::StatementInvalid, /purge_on_end_of_month/)
+  it "keeps every date at the end of a quarter, in the database too" do
+    [ Date.new(2027, 3, 15), Date.new(2027, 4, 30) ].each do |date|
+      expect { User.transaction(requires_new: true) { user.update_columns(purge_on: date) } }
+        .to raise_error(ActiveRecord::StatementInvalid, /purge_on_end_of_quarter/)
+    end
+    expect { user.update_columns(purge_on: Date.new(2027, 6, 30)) }.not_to raise_error
+  end
+
+  it "starts no session for an account purged since it was loaded" do
+    stale = User.find(user.id)
+    user.purge_if_unused!
+
+    expect(stale.start_session!).to be_nil
+    expect(Session.where(user_id: user.id)).to be_empty
   end
 end

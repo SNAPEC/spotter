@@ -13,6 +13,8 @@ Rails.application.configure do
     policy.img_src :self, :data
     policy.script_src :self
     policy.style_src :self
+    # Enforced, and reported: a violation shows up in the log (directive and blocked origin only).
+    policy.report_uri "/csp_reports"
   end
 
   # The importmap and Turbo's progress bar are inline: they carry this nonce instead of 'unsafe-inline'.

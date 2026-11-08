@@ -3,7 +3,7 @@ class User < ApplicationRecord
   MINIMUM_ADMINS = 2
   ENROLLMENT_CODE_VALIDITY = 7.days
   # Declarant accounts nobody uses are purged: never signed in, 30 days after creation; otherwise
-  # 12 months after the last session expired. Both rounded up to the end of a month.
+  # 12 months after the last session expired. Both rounded up to the end of a quarter.
   UNUSED_ACCOUNT_DELAY = 30.days
   DORMANT_ACCOUNT_DELAY = 12.months
 
@@ -22,9 +22,15 @@ class User < ApplicationRecord
 
   scope :staff, -> { where(role: %w[analyst admin]) }
   scope :active, -> { where(deactivated_at: nil) }
-  scope :purge_due, -> { declarant.where(purge_on: ...Date.current) }
+  # An ex-staff member demoted to declarant stays: access logs and audit events keep pointing at them.
+  scope :purge_due, -> {
+    declarant.where(purge_on: ...Date.current)
+      .where.not(id: AccessLog.select(:user_id))
+      .where.not(id: AuditEvent.select(:actor_id))
+      .where.not(id: AuditEvent.where(subject_type: name).select(:subject_id))
+  }
 
-  attribute :purge_on, :date, default: -> { (Date.current + UNUSED_ACCOUNT_DELAY).end_of_month }
+  attribute :purge_on, :date, default: -> { (Date.current + UNUSED_ACCOUNT_DELAY).end_of_quarter }
 
   encrypts :email, deterministic: true, downcase: true
   normalizes :email, with: ->(email) { email.strip }
@@ -50,11 +56,14 @@ class User < ApplicationRecord
       email.to_s.strip.downcase)
   end
 
+  # One account failing must not stop the others; the log names the error class only.
   def self.purge_unused
     purge_due.find_each do |user|
       user.purge_if_unused!
     rescue ActiveRecord::RecordNotFound
       next
+    rescue ActiveRecord::ActiveRecordError => error
+      Rails.logger.error("Unused account purge skipped an account: #{error.class.name}")
     end
   end
 
@@ -75,8 +84,22 @@ class User < ApplicationRecord
     consumed
   end
 
+  # Lock order: the user, then the new session. A purge holding the lock first wins, and the sign-in
+  # finds no account instead of failing on the foreign key.
+  def start_session!
+    transaction do
+      lock!
+      sessions.create!
+    end
+  rescue ActiveRecord::RecordNotFound
+    nil
+  end
+
+  # Lock order, on every path: admin rows (id order), then the user, then its sessions. Taking the
+  # user first here keeps a concurrent passkey enrolment, which does the same, from deadlocking.
   def sign_out_everywhere!
     transaction do
+      lock!
       sessions.destroy_all
       increment!(:login_token_version)
     end
@@ -101,7 +124,7 @@ class User < ApplicationRecord
 
   # Pushed forward only: an older session created later never brings the date back.
   def postpone_purge!(session_expires_on:)
-    purge_on = (session_expires_on + DORMANT_ACCOUNT_DELAY).end_of_month
+    purge_on = (session_expires_on + DORMANT_ACCOUNT_DELAY).end_of_quarter
     User.where(id: id, purge_on: ...purge_on).update_all(purge_on: purge_on)
   end
 
@@ -109,7 +132,7 @@ class User < ApplicationRecord
   # row lock, which a sign-in creating a session also needs.
   def purge_if_unused!
     with_lock do
-      destroy! if declarant? && purge_on < Date.current && sessions.none? && ReportOwnership.of(self).live.none?
+      destroy! if User.purge_due.exists?(id) && sessions.none? && ReportOwnership.of(self).live.none?
     end
   end
 
@@ -215,8 +238,8 @@ class User < ApplicationRecord
       by.reload.then { |actor| actor.admin? && actor.active? }
     end
 
-    # Serialises with Session#register_passkey!, which locks the same row. Taken after the admin rows
-    # (acting_admin?), never before, so two admins acting on each other cannot deadlock.
+    # Serialises with Session#register_passkey!, which locks the same row. Lock order: after the admin
+    # rows (acting_admin?), before any session, so two admins acting on each other cannot deadlock.
     def lock_for_passkey_change!
       lock!
     end

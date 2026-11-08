@@ -40,16 +40,18 @@ module Authentication
       session.delete(:return_to_after_authenticating) || root_url
     end
 
-    # A fresh Rails session defeats fixation; only the return URL survives it.
+    # A fresh Rails session defeats fixation; only the return URL survives it. Nil when the account
+    # is gone by now (purged).
     def start_new_session_for(user)
+      return unless (new_session = user.start_session!)
+
       return_to = session[:return_to_after_authenticating]
       reset_session
       session[:return_to_after_authenticating] = return_to if return_to
 
-      user.sessions.create!.tap do |session|
-        Current.session = session
-        cookies.signed[:session_id] = { value: session.id, expires: session.expires_on.end_of_day, httponly: true, same_site: :lax }
-      end
+      Current.session = new_session
+      cookies.signed[:session_id] = { value: new_session.id, expires: new_session.expires_on.end_of_day, httponly: true, same_site: :lax }
+      new_session
     end
 
     def terminate_session

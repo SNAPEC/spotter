@@ -35,7 +35,7 @@ module Authorization
     end
 
     # A recovery code proves less than a passkey: until a new passkey is registered, the session
-    # reaches only the enrolment and sign out.
+    # reaches only the enrolment and signing out (here or everywhere).
     def require_passkey_after_recovery
       return unless Current.session&.recovered?
 

@@ -10,6 +10,7 @@ RSpec.describe "Routes for a signed-out visitor", type: :request do
     "GET /login/:token" => "magic link confirmation",
     "POST /login/:token" => "magic link consumption",
     "GET /up" => "health check, no data",
+    "POST /csp_reports" => "browser CSP violation reports: logs a scrubbed line, no data returned",
     "GET /recede_historical_location" => "Turbo Native history helper: a static page, no data",
     "GET /resume_historical_location" => "Turbo Native history helper: a static page, no data",
     "GET /refresh_historical_location" => "Turbo Native history helper: a static page, no data"
