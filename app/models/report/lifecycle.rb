@@ -45,6 +45,9 @@ module Report::Lifecycle
       raise Report::InvalidTransition, "already taken in charge" if taken_in_charge?
 
       assign_attributes(attrs)
+      # A form sent back unchanged keeps its analysis rather than queue a new one for the same text.
+      next unless changed_for_autosave?
+
       self.content_revision += 1
       through_lifecycle do
         self.status = "submitted"
