@@ -21,7 +21,7 @@ La politique est stricte et appliquée (`config/initializers/content_security_po
 - Toute l'interface est en français dans `config/locales/fr.yml`, avec des clés en anglais. Dans une vue, la recherche paresseuse : `t(".title")` sous `fr.<contrôleur>.<action>.title`.
 - Libellés des champs et messages d'erreur des modèles : `fr.activerecord.attributes` et `fr.activerecord.errors`.
 - Les libellés de la taxonomie viennent de la base (`TaxonomyField#label`, `TaxonomyOption#label`, `definition`), pas des fichiers de traduction.
-- Les noms de mois manquent : `l(report.submitted_on, format: "%B %Y")` affiche « Translation missing: fr.date.month_names » **sans lever d'erreur** (une spec ne le voit pas) tant que `fr.date.month_names` n'est pas dans `fr.yml`. Les ajouter là, sans gemme.
+- Le mois d'un rapport s'affiche avec `l(report.submitted_on, format: :month)`, qui donne « novembre 2026 » (PR #24). Jamais `:long` ni `:default`, qui afficheraient un jour (le 1er) qui a l'air réel.
 - Typographie : apostrophe courbe (’), espaces insécables avant `:`, `;`, `?`, `!` comme dans les clés existantes.
 
 ## Composants et jetons

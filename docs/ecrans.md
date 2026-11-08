@@ -77,7 +77,7 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 - Ne jamais afficher ni chercher qui est l'auteur. `ReportOwnership` n'a rien à faire dans une vue de l'équipe.
 - Actions, chacune un formulaire en `POST` vers une action qui appelle une méthode :
   - Prendre en charge : `report.take_charge!(Current.user)`. Ferme la modification par le déclarant. Idempotent.
-  - Poser une question : `report.ask_clarification!(Current.user, body)`. Aucun mail sur le moment ; le déclarant confidentiel reçoit un mail neutre le lundi suivant, seulement si le lien vit encore et si son compte est actif. Après les 60 jours, le déclarant ne retrouve plus le rapport et ne peut plus répondre : l'écran doit le signaler à l'analyste avant qu'il pose la question. Le modèle n'expose pas encore cette information (voir la fin de cette page).
+  - Poser une question : `report.ask_clarification!(Current.user, body)`. Aucun mail sur le moment ; le déclarant confidentiel reçoit un mail neutre le lundi suivant, seulement si le lien vit encore et si son compte est actif. Après les 60 jours, le déclarant ne retrouve plus le rapport et ne peut plus répondre. L'écran le rappelle par une mention générale (« en mode confidentiel, le déclarant ne peut répondre que dans les 60 jours qui suivent l'envoi »), jamais par un état propre au rapport, qui donnerait le jour d'envoi.
   - Valider : `report.validate!(Current.user)`, seulement depuis `in_validation`.
   - Rejeter : `report.reject!(Current.user)`, depuis tout statut sous analyse.
 - Valider et rejeter suppriment le récit, le fil et le lien vers l'auteur, sans retour possible : demander confirmation (`data-turbo-confirm`, ou le contrôleur Stimulus `confirm` pour un formulaire sans Turbo).
@@ -103,4 +103,4 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 8. **Changer un rôle**, nommer un analyste : aucune méthode (la règle des deux admins est déjà dans la validation de `User`).
 9. **Les statistiques** : aucune requête.
 10. **L'enregistrement par étape.** `save_draft!` remplace `answers` et `free_text_answers` en entier ; une fusion par étape dans le modèle éviterait de renvoyer tout le hash à chaque étape.
-11. **« Le déclarant peut-il encore répondre ? »** Pour l'analyste : lien vivant en confidentiel, code de suivi présent en anonyme. Aucune méthode ne l'expose, et l'écran ne doit pas lire `ReportOwnership` lui-même.
+11. **« Le déclarant peut-il encore répondre ? »** Volontairement sans réponse par rapport : en confidentiel, la réponse bascule le jour exact de la coupure, soit 60 jours après la soumission, et un écran de l'équipe qui l'afficherait donnerait le jour d'envoi. L'écran analyste affiche une mention générale, la même pour tous les rapports, et ne lit jamais `ReportOwnership`.

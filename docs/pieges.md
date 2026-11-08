@@ -19,6 +19,8 @@
 - **Un rapport décidé est figé.** Ses victimes, son récit, son fil et ses analyses refusent toute écriture.
 - **Les dates sont celles de Paris.** `Date.current`, jamais `Date.today` (fuseau du serveur).
 
+- **Un prédicat peut dater un rapport.** Toute méthode dont la réponse bascule à `cutoff_on` ou à `editable_until` donne le jour de soumission à qui la voit changer. Ne pas en exposer à l'équipe.
+
 ## Contrôleurs
 
 - **`require_role` suppose un compte.** Sur un contrôleur ouvert sans connexion, il plante (`Current.user` vaut `nil`) : ne pas le déclarer, et ajouter le contrôleur aux exemptions de `default_deny_spec.rb`.
