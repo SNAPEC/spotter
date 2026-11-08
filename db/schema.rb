@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_210002) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_210003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -47,6 +47,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_210002) do
     t.datetime "created_at", null: false
     t.index ["actor_id"], name: "index_audit_events_on_actor_id"
     t.index ["subject_type", "subject_id"], name: "index_audit_events_on_subject"
+    t.check_constraint "action::text = ANY (ARRAY['passkeys.reset'::character varying, 'enrollment_code.issued'::character varying, 'user.deactivated'::character varying]::text[])", name: "audit_events_action_check"
   end
 
   create_table "casualties", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
