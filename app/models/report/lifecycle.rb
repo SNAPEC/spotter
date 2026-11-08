@@ -16,17 +16,7 @@ module Report::Lifecycle
 
   # Only the content of the form: state, dates and digests stay in the lifecycle's hands.
   def save_draft!(attrs)
-    attrs = attrs.to_h.deep_stringify_keys
-    check_draft_keys!(attrs, Report::DRAFT_ATTRIBUTES)
-    check_draft_keys!(attrs["narrative_attributes"], Report::DRAFT_NARRATIVE_ATTRIBUTES) if attrs.key?("narrative_attributes")
-    if attrs.key?("casualties_attributes")
-      casualties = attrs["casualties_attributes"]
-      raise ArgumentError, "casualties must be a list or a hash" unless casualties.is_a?(Hash) || casualties.is_a?(Array)
-
-      (casualties.is_a?(Hash) ? casualties.values : casualties).each do |casualty|
-        check_draft_keys!(casualty, Report::DRAFT_CASUALTY_ATTRIBUTES)
-      end
-    end
+    attrs = form_content(attrs)
 
     with_lock do
       raise Report::InvalidTransition, "not an open draft" unless open_draft?
@@ -38,6 +28,32 @@ module Report::Lifecycle
     end
   rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound
     # Errors stay for the form; unsaved values go, so the next call can lock the row again.
+    restore_attributes
+    raise
+  end
+
+  # The declarant may correct a submitted report until staff take it in charge. The analyses go: their
+  # excerpts quote the old text. The new revision makes a run still working on the old text write
+  # nothing. Ownership cutoff, tracking code and submission month stay as submit! set them.
+  # Authorisation comes before any state check, so a stranger learns nothing about the report.
+  def edit_submitted!(attrs, user: nil, tracking_code: nil)
+    attrs = form_content(attrs)
+
+    with_lock do
+      raise Report::NotAllowed, "not the declarant of this report" unless declarant?(user: user, tracking_code: tracking_code)
+      raise Report::InvalidTransition, "cannot edit a #{status} report" unless under_analysis?
+      raise Report::InvalidTransition, "already taken in charge" if taken_in_charge?
+
+      assign_attributes(attrs)
+      self.content_revision += 1
+      through_lifecycle do
+        self.status = "submitted"
+        save!
+      end
+      analyses.destroy_all
+      AnalyzeReportJob.perform_later(self, content_revision)
+    end
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotFound
     restore_attributes
     raise
   end
@@ -101,6 +117,21 @@ module Report::Lifecycle
 
     def status_changes_through_lifecycle
       errors.add(:status, :invalid) if will_save_change_to_status? && !lifecycle_transition?
+    end
+
+    def form_content(attrs)
+      attrs = attrs.to_h.deep_stringify_keys
+      check_draft_keys!(attrs, Report::DRAFT_ATTRIBUTES)
+      check_draft_keys!(attrs["narrative_attributes"], Report::DRAFT_NARRATIVE_ATTRIBUTES) if attrs.key?("narrative_attributes")
+      if attrs.key?("casualties_attributes")
+        casualties = attrs["casualties_attributes"]
+        raise ArgumentError, "casualties must be a list or a hash" unless casualties.is_a?(Hash) || casualties.is_a?(Array)
+
+        (casualties.is_a?(Hash) ? casualties.values : casualties).each do |casualty|
+          check_draft_keys!(casualty, Report::DRAFT_CASUALTY_ATTRIBUTES)
+        end
+      end
+      attrs
     end
 
     def check_draft_keys!(attrs, allowed)
