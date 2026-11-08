@@ -148,7 +148,6 @@ class Report < ApplicationRecord
 
     def answers_fit_taxonomy
       codes = taxonomy_version.validate_answers(answers, scope: :report)
-      codes += answers.keys.map(&:to_s).intersection(taxonomy_version.free_text_codes).map { |code| "#{code}.free_text" } if answers.is_a?(Hash)
       errors.add(:answers, :invalid, codes: codes) if codes.any?
     end
 end

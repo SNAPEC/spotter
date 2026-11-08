@@ -132,8 +132,7 @@ RSpec.describe TaxonomyVersion do
     it "accepts valid answers" do
       multi = report_fields.find_by!(kind: "multi")
       integer = report_fields.find_by!(kind: "integer")
-      text = report_fields.find_by!(kind: "text")
-      answers = { "cause" => valid_cause, multi.code => [ multi.options.first.code ], integer.code => 3, text.code => "ok" }
+      answers = { "cause" => valid_cause, multi.code => [ multi.options.first.code ], integer.code => 3 }
       expect(version.validate_answers(answers, scope: :report)).to eq([])
     end
 
@@ -155,11 +154,11 @@ RSpec.describe TaxonomyVersion do
       expect(version.validate_answers({ multi.code => [ "zzz" ] }, scope: :report)).to eq([ "#{multi.code}.invalid_option" ])
     end
 
-    it "flags a non-integer and a non-string" do
+    it "flags a non-integer and any free-text answer" do
       integer = report_fields.find_by!(kind: "integer")
       text = report_fields.find_by!(kind: "text")
       expect(version.validate_answers({ integer.code => "3" }, scope: :report)).to eq([ "#{integer.code}.not_an_integer" ])
-      expect(version.validate_answers({ text.code => 3 }, scope: :report)).to eq([ "#{text.code}.not_a_string" ])
+      expect(version.validate_answers({ text.code => 3 }, scope: :report)).to eq([ "#{text.code}.free_text" ])
     end
 
     it "only accepts fields of the given scope" do

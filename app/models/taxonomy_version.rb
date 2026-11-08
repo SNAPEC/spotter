@@ -79,7 +79,7 @@ class TaxonomyVersion < ApplicationRecord
     text_fields.pluck(:code)
   end
 
-  # Codes are "<field>.<error>": unknown_field, invalid_option, duplicate_option, not_a_list, not_a_string,
+  # Codes are "<field>.<error>": unknown_field, invalid_option, duplicate_option, not_a_list, free_text,
   # not_an_integer, out_of_range; "answers.not_a_hash" when answers is not a Hash.
   def validate_answers(answers, scope:)
     return [ "answers.not_a_hash" ] unless answers.is_a?(Hash)
@@ -114,7 +114,7 @@ class TaxonomyVersion < ApplicationRecord
       elsif !value.all? { |item| item.is_a?(String) && codes.include?(item) } then "invalid_option"
       elsif value.uniq.size != value.size then "duplicate_option"
       end
-    when "text" then "not_a_string" unless value.is_a?(String)
+    when "text" then "free_text"
     when "integer"
       if !value.is_a?(Integer) then "not_an_integer"
       elsif value.negative? then "out_of_range"
