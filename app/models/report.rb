@@ -43,7 +43,7 @@ class Report < ApplicationRecord
         draft_expires_on: Date.current + DRAFT_VALIDITY,
         draft_token_digest: token && digest(token, purpose: :draft_token)
       )
-      report.create_report_ownership!(user: user, cutoff_on: report.draft_expires_on) if user
+      report.create_report_ownership!(user: user, cutoff_on: report.draft_cutoff_on) if user
       [ report, token ]
     end
   end
@@ -92,6 +92,11 @@ class Report < ApplicationRecord
 
   def expired_draft?
     draft? && draft_expires_on < Date.current
+  end
+
+  # The draft stays open through its expiry day: the link goes the day after, with the draft itself.
+  def draft_cutoff_on
+    draft_expires_on + 1
   end
 
   private

@@ -21,7 +21,7 @@ module Report::Lifecycle
       assign_attributes(attrs)
       self.draft_expires_on = Date.current + Report::DRAFT_VALIDITY
       save!
-      report_ownership&.update!(cutoff_on: draft_expires_on)
+      report_ownership&.update!(cutoff_on: draft_cutoff_on)
     end
   end
 

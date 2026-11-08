@@ -62,7 +62,7 @@ RSpec.describe Report, type: :model do
 
         expect(token).to be_nil
         expect(report.draft_token_digest).to be_nil
-        expect(report.report_ownership.cutoff_on).to eq(report.draft_expires_on)
+        expect(report.report_ownership.cutoff_on).to eq(Date.new(2026, 12, 18))
         expect(report.report_ownership.user_ref).to eq(user.id.to_s)
         expect(described_class.owned_by(user)).to contain_exactly(report)
       end
@@ -126,6 +126,33 @@ RSpec.describe Report, type: :model do
     end
   end
 
+  describe "confidential draft on its last day" do
+    let(:report) { described_class.start_draft!(mode: "confidential", user: user).first }
+
+    def run_daily_jobs
+      CutOwnershipsJob.perform_now
+      PurgeExpiredDraftsJob.perform_now
+    end
+
+    it "is still owned and submittable on its expiry day" do
+      travel_to(report.draft_expires_on) do
+        run_daily_jobs
+
+        expect(described_class.owned_by(user)).to contain_exactly(report)
+        expect { report.submit! }.not_to raise_error
+      end
+    end
+
+    it "loses both its link and its content the day after" do
+      travel_to(report.draft_expires_on + 1) do
+        run_daily_jobs
+
+        expect(described_class.where(id: report.id)).to be_empty
+        expect(ReportOwnership.where(report_id: report.id)).to be_empty
+      end
+    end
+  end
+
   describe "#save_draft!" do
     let(:report) { described_class.start_draft!(mode: "confidential", user: user).first }
 
@@ -135,7 +162,7 @@ RSpec.describe Report, type: :model do
         report.save_draft!(event_type: "accident", discipline: "lead")
 
         expect(report.reload.draft_expires_on).to eq(Date.current + 30)
-        expect(report.report_ownership.reload.cutoff_on).to eq(report.draft_expires_on)
+        expect(report.report_ownership.reload.cutoff_on).to eq(report.draft_expires_on + 1)
         expect(report.discipline).to eq("lead")
       end
     end
