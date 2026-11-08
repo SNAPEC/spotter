@@ -128,10 +128,12 @@ module Report::Lifecycle
     end
 
     # Everything that could point back to the author or quote them goes, in one transaction. Free-text
-    # answers go too: only coded answers are kept.
+    # answers, clarifications and the extractor's excerpts go too: only coded answers are kept.
     def purge_after_decision!
       text_codes = free_text_codes
       narrative&.purge_raw!
+      clarifications.destroy_all
+      analyses.each(&:strip_raw_excerpts!)
       casualties.each { |casualty| casualty.update!(answers: casualty.answers.except(*text_codes)) }
       report_ownership&.destroy!
       assign_attributes(answers: answers.except(*text_codes), tracking_code_digest: nil, draft_token_digest: nil)
