@@ -12,6 +12,12 @@ RSpec.describe Report, type: :model do
       expect(described_class.column_names).not_to include("created_at", "updated_at")
     end
 
+    it "gives its dependent tables UUID ids, which do not reveal creation order" do
+      [ Casualty, Narrative, ReportOwnership ].each do |model|
+        expect(model.columns_hash["id"].type).to eq(:uuid)
+      end
+    end
+
     it "has no timestamps on its dependent tables" do
       [ Casualty, Narrative, ReportOwnership ].each do |model|
         expect(model.column_names).not_to include("created_at", "updated_at")

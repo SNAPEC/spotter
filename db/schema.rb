@@ -24,14 +24,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100004) do
     t.index ["subject_type", "subject_id"], name: "index_audit_events_on_subject"
   end
 
-  create_table "casualties", force: :cascade do |t|
+  create_table "casualties", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "report_id", null: false
     t.string "severity"
     t.jsonb "answers", default: {}, null: false
     t.index ["report_id"], name: "index_casualties_on_report_id"
   end
 
-  create_table "narratives", force: :cascade do |t|
+  create_table "narratives", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "report_id", null: false
     t.text "raw_text"
     t.text "debrief_causes"
@@ -61,7 +61,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100004) do
     t.index ["user_id"], name: "index_recovery_codes_on_user_id"
   end
 
-  create_table "report_ownerships", force: :cascade do |t|
+  create_table "report_ownerships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "report_id", null: false
     t.string "user_ref", null: false
     t.date "cutoff_on", null: false

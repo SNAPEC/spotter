@@ -1,6 +1,6 @@
 class CreateNarratives < ActiveRecord::Migration[8.1]
   def change
-    create_table :narratives do |t|
+    create_table :narratives, id: :uuid do |t|
       t.references :report, type: :uuid, null: false, foreign_key: true, index: { unique: true }
       t.text :raw_text
       t.text :debrief_causes
