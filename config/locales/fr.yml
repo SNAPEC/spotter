@@ -9,6 +9,8 @@ fr:
       default: "%d/%m/%Y"
       short: "%e %b"
       long: "%e %B %Y"
+      # A report carries only its month: never show it with a day.
+      month: "%B %Y"
   magic_link_mailer:
     sign_in:
       subject: "Votre lien de connexion à Spotter"
@@ -208,6 +210,7 @@ fr:
     attributes:
       report:
         event_type: "Le type d’événement"
+        answers: "Les réponses"
         narrative: "Le récit"
         casualties: "Les personnes blessées"
       narrative:
