@@ -94,6 +94,27 @@ RSpec.describe Report::Analyzer, type: :model do
       expect(report.reload).to be_analyzing
     end
 
+    it "writes nothing when the content changed while the extractor ran" do
+      extractor = Llm::FakeExtractor.new
+      edited = report
+      extractor.define_singleton_method(:extract) do |text:, schema:|
+        Report.where(id: edited.id).update_all("content_revision = content_revision + 1")
+        super(text: text, schema: schema)
+      end
+
+      expect(analyze(extractor)).to be_nil
+      expect(Analysis.where(report_id: report.id)).to be_empty
+      expect(report.reload).to be_analyzing
+    end
+
+    it "does not start a report whose content changed since it was asked" do
+      stale = report.content_revision
+      Report.where(id: report.id).update_all("content_revision = content_revision + 1")
+
+      expect(described_class.new.call(report, revision: stale)).to be_nil
+      expect(report.reload).to be_submitted
+    end
+
     it "refuses proposals outside the schema and keeps the report in analysis" do
       extractor = Llm::FakeExtractor.new
       def extractor.extract(text:, schema:) = { "weather" => { "value" => "snowstorm", "excerpt" => "x" } }
@@ -119,6 +140,15 @@ RSpec.describe Report::Analyzer, type: :model do
     it "also takes a report still waiting for its analysis" do
       expect(described_class.new.record_failure(report).status).to eq("failed")
       expect(report.reload).to be_in_validation
+    end
+
+    it "writes nothing for a content that changed since it was asked" do
+      stale = report.content_revision
+      Report.where(id: report.id).update_all("content_revision = content_revision + 1")
+
+      expect(described_class.new.record_failure(report, revision: stale)).to be_nil
+      expect(Analysis.where(report_id: report.id)).to be_empty
+      expect(report.reload).to be_submitted
     end
 
     it "leaves a decided report alone" do
