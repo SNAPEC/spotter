@@ -42,7 +42,7 @@ RSpec.describe User, "deactivation", type: :model do
     end
 
     it "keeps the account referenced by access logs and audit events" do
-      AccessLog.record!(user: analyst, report: Struct.new(:id).new(SecureRandom.uuid), action: "view")
+      AccessLog.record!(user: analyst, report: Struct.new(:id).new(SecureRandom.uuid), action: "take_charge")
       analyst.issue_enrollment_code!(by: admin)
       AuditEvent.record!(actor: analyst, action: "user.deactivated", subject: other_admin)
 
