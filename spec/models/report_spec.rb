@@ -39,6 +39,11 @@ RSpec.describe Report, type: :model do
       expect(Narrative.encrypted_attributes).to include(:raw_text, *Narrative::DEBRIEF_FIELDS.map(&:to_sym))
       expect(ReportOwnership.encrypted_attributes).to include(:user_ref)
     end
+
+    it "stores the answers to the five debriefing questions of taxonomy v0" do
+      expect(Narrative::DEBRIEF_FIELDS).to eq(%w[debrief_causes debrief_what_worked debrief_do_differently debrief_changes_made debrief_message])
+      expect(Narrative.column_names).to include(*Narrative::DEBRIEF_FIELDS)
+    end
   end
 
   describe ".start_draft!" do
@@ -169,7 +174,7 @@ RSpec.describe Report, type: :model do
 
     it "saves the narrative and casualties" do
       report.save_draft!(
-        narrative_attributes: { raw_text: "Chute fictive au troisième point.", debrief_lessons: "Vérifier le noeud." },
+        narrative_attributes: { raw_text: "Chute fictive au troisième point.", debrief_do_differently: "Vérifier le noeud." },
         casualties_attributes: [ { severity: "minor", answers: { "age_range" => "from_18_to_39" } } ]
       )
 

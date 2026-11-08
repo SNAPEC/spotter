@@ -34,11 +34,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100004) do
   create_table "narratives", force: :cascade do |t|
     t.uuid "report_id", null: false
     t.text "raw_text"
-    t.text "debrief_context"
     t.text "debrief_causes"
-    t.text "debrief_response"
-    t.text "debrief_consequences"
-    t.text "debrief_lessons"
+    t.text "debrief_what_worked"
+    t.text "debrief_do_differently"
+    t.text "debrief_changes_made"
+    t.text "debrief_message"
     t.text "anonymized_text"
     t.jsonb "anonymized_debrief"
     t.index ["report_id"], name: "index_narratives_on_report_id", unique: true
@@ -88,9 +88,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_100004) do
     t.index ["status"], name: "index_reports_on_status"
     t.index ["taxonomy_version_id"], name: "index_reports_on_taxonomy_version_id"
     t.index ["tracking_code_digest"], name: "index_reports_on_tracking_code_digest", unique: true
-    t.check_constraint "event_type::text = ANY (ARRAY['accident'::character varying, 'incident'::character varying, 'near_miss'::character varying]::text[])", name: "reports_event_type_check"
-    t.check_constraint "mode::text = ANY (ARRAY['confidential'::character varying, 'anonymous'::character varying]::text[])", name: "reports_mode_check"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'submitted'::character varying, 'analyzing'::character varying, 'in_validation'::character varying, 'validated'::character varying, 'rejected'::character varying]::text[])", name: "reports_status_check"
+    t.check_constraint "event_type::text = ANY (ARRAY['accident'::character varying::text, 'incident'::character varying::text, 'near_miss'::character varying::text])", name: "reports_event_type_check"
+    t.check_constraint "mode::text = ANY (ARRAY['confidential'::character varying::text, 'anonymous'::character varying::text])", name: "reports_mode_check"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying::text, 'submitted'::character varying::text, 'analyzing'::character varying::text, 'in_validation'::character varying::text, 'validated'::character varying::text, 'rejected'::character varying::text])", name: "reports_status_check"
   end
 
   create_table "sessions", force: :cascade do |t|

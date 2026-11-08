@@ -1,5 +1,7 @@
 class Narrative < ApplicationRecord
-  DEBRIEF_FIELDS = %w[debrief_context debrief_causes debrief_response debrief_consequences debrief_lessons].freeze
+  # The five debriefing questions of taxonomy v0: what led to the event, what worked, what to do
+  # differently, what already changed in practice, message to other instructors.
+  DEBRIEF_FIELDS = %w[debrief_causes debrief_what_worked debrief_do_differently debrief_changes_made debrief_message].freeze
 
   belongs_to :report
 
