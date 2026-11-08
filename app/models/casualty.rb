@@ -5,7 +5,7 @@ class Casualty < ApplicationRecord
 
   normalizes :severity, with: ->(value) { value.presence }
 
-  before_validation :cast_answers, if: -> { report&.taxonomy_version }
+  before_validation :cast_answers, if: -> { report&.taxonomy_version && will_save_change_to_answers? }
   validate :severity_is_an_option, :answers_fit_taxonomy, if: -> { report&.taxonomy_version }
   before_destroy :refuse_once_decided
 
