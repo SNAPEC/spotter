@@ -18,6 +18,8 @@ class Report::Analyzer
   def call(report, revision:)
     existing = analysis_of(report)
     return existing if existing
+    # Nothing left to read: the analyst codes the report by hand.
+    return record_failure(report, revision: revision) if report.raw_content_purged?
 
     report.with_lock { report.start_analysis! if report.submitted? && report.content_revision == revision }
     return unless report.analyzing? && report.content_revision == revision

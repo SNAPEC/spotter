@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_210003) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_210004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -121,6 +121,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_210003) do
     t.boolean "taken_in_charge", default: false, null: false
     t.integer "content_revision", default: 0, null: false
     t.date "editable_until"
+    t.boolean "raw_content_purged", default: false, null: false
     t.index ["draft_expires_on"], name: "index_reports_on_draft_expires_on"
     t.index ["draft_token_digest"], name: "index_reports_on_draft_token_digest", unique: true
     t.index ["status"], name: "index_reports_on_status"

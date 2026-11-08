@@ -35,7 +35,7 @@ class Report < ApplicationRecord
   scope :expired_drafts, -> { where(status: "draft", draft_expires_on: ...Date.current) }
   # Anonymous reports have no one to write to: they are left alone.
   scope :awaiting_declarant_notice, -> {
-    where(mode: "confidential", status: UNDER_ANALYSIS_STATUSES, declarant_notified: false)
+    where(mode: "confidential", status: UNDER_ANALYSIS_STATUSES, declarant_notified: false, raw_content_purged: false)
       .where(id: Clarification.where(author: "analyst").select(:report_id))
   }
 
@@ -125,6 +125,9 @@ class Report < ApplicationRecord
     raise Report::NotAllowed, "only active staff ask for clarification" unless analyst&.active_staff?
 
     with_lock do
+      # No declarant is left to answer, and the question would outlive the purge.
+      raise Report::InvalidTransition, "raw content purged" if raw_content_purged?
+
       was_awaiting = awaiting_clarification?
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
