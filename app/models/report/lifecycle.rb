@@ -67,6 +67,7 @@ module Report::Lifecycle
     transition!(from: "analyzing", to: "in_validation")
   end
 
+  # Shadows ActiveModel's validate!: use valid? or save! to run the model validations.
   def validate!(analyst)
     decide!(analyst, from: %w[in_validation], to: "validated")
   end
