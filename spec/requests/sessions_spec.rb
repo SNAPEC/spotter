@@ -67,7 +67,8 @@ RSpec.describe "Sessions", type: :request do
     expect(Session.exists?(other.id)).to be(true)
 
     follow_redirect!
-    expect(response.body).to include("Vous êtes déconnecté")
+    expect(response.body.scan(I18n.t("sessions.signed_out")).size).to eq(1)
+    expect(response.body).to include('<html lang="fr">')
   end
 
   it "signs out everywhere and kills a pending magic link" do

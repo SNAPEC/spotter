@@ -3,7 +3,6 @@
 <div class="mx-auto w-full max-w-md">
   <h1 class="font-bold text-3xl"><%= t(".title") %></h1>
   <p class="mt-4"><%= t(".body") %></p>
-  <%= render "components/flash" %>
 
   <%= form_with url: passkey_session_path, class: "mt-6 space-y-4",
     data: { turbo: false, controller: "webauthn", action: "webauthn#start",

@@ -220,6 +220,8 @@ RSpec.describe "Passkey flow", type: :request do
 
       expect(analyst.passkeys.count).to eq(2)
       expect(response).to redirect_to(root_url)
+      follow_redirect! while response.redirect?
+      expect(response.body.scan(I18n.t("passkey_registrations.create.done")).size).to eq(1)
     end
 
     it "accepts a recovery code once, for this session only" do

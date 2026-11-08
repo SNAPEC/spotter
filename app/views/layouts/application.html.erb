@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
   <head>
     <title><%= content_for(:title) || "Spotter" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -42,6 +42,9 @@
       </div>
     </header>
     <main id="main" class="mx-auto w-full max-w-5xl px-gutter py-8">
+      <% if flash[:notice] || flash[:alert] %>
+        <div class="mb-6"><%= render "components/flash" %></div>
+      <% end %>
       <%= yield %>
     </main>
   </body>
