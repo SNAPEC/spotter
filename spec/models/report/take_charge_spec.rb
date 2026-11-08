@@ -31,7 +31,7 @@ RSpec.describe Report, "taking in charge", type: :model do
     it "works in each status under analysis" do
       report.take_charge!(analyst)
       analyzing = Report.start_draft!(mode: "anonymous").first.tap { |other| other.submit!; other.start_analysis! }
-      in_validation = Report.start_draft!(mode: "anonymous").first.tap { |other| other.submit!; Report::Analyzer.new.call(other) }
+      in_validation = Report.start_draft!(mode: "anonymous").first.tap { |other| other.submit!; Report::Analyzer.new.call(other, revision: other.content_revision) }
 
       [ analyzing, in_validation ].each { |other| other.take_charge!(analyst) }
 
@@ -67,7 +67,7 @@ RSpec.describe Report, "taking in charge", type: :model do
 
     { validate!: "in_validation", reject!: "submitted" }.each do |decision, status|
       it "take the report in charge with #{decision}, and keep it so after the purge" do
-        Report::Analyzer.new.call(report) if status == "in_validation"
+        Report::Analyzer.new.call(report, revision: report.content_revision) if status == "in_validation"
         report.public_send(decision, analyst)
 
         expect(report.reload).to be_taken_in_charge

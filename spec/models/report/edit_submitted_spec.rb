@@ -23,7 +23,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
   let(:report) { submitted.first }
 
   def analyzed(report)
-    Report::Analyzer.new.call(report)
+    Report::Analyzer.new.call(report, revision: report.content_revision)
     report.reload
   end
 
@@ -39,7 +39,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
     {
       "submitted" => ->(report) { report },
       "analyzing" => ->(report) { report.tap(&:start_analysis!) },
-      "in_validation" => ->(report) { Report::Analyzer.new.call(report) && report.reload }
+      "in_validation" => ->(report) { Report::Analyzer.new.call(report, revision: report.content_revision) && report.reload }
     }.each do |status, reach|
       it "takes the new content and goes back to submitted from #{status}" do
         reach.call(report)
@@ -112,7 +112,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
       "take_charge!" => [ ->(report, analyst) { report.take_charge!(analyst) }, Report::InvalidTransition ],
       "ask_clarification!" => [ ->(report, analyst) { report.ask_clarification!(analyst, "Question fictive ?") }, Report::InvalidTransition ],
       # The decision cuts the authorship link: the declarant is no longer recognised at all.
-      "validate!" => [ ->(report, analyst) { Report::Analyzer.new.call(report) && report.validate!(analyst) }, Report::NotAllowed ],
+      "validate!" => [ ->(report, analyst) { Report::Analyzer.new.call(report, revision: report.content_revision) && report.validate!(analyst) }, Report::NotAllowed ],
       "reject!" => [ ->(report, analyst) { report.reject!(analyst) }, Report::NotAllowed ]
     }.each do |action, (act, error)|
       it "is refused after #{action}" do
@@ -184,7 +184,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
       end
       clear_enqueued_jobs
 
-      expect(Report::Analyzer.new(extractor: extractor).call(report)).to be_nil
+      expect(Report::Analyzer.new(extractor: extractor).call(report, revision: 0)).to be_nil
       expect(Analysis.where(report_id: report.id)).to be_empty
       expect(report.reload).to be_analyzing
 
