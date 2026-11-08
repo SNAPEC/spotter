@@ -253,12 +253,9 @@ RSpec.describe "Passkey flow", type: :request do
         get path
         expect(response).to redirect_to(new_passkey_registration_path)
       end
-      delete sessions_path
-      expect(response).to redirect_to(new_passkey_registration_path)
-      expect(analyst.sessions.count).to eq(1)
-
       get "/analyst"
-      register_passkey(nickname: "Nouvel appareil", authenticator: WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin))
+      expect { register_passkey(nickname: "Nouvel appareil", authenticator: WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin)) }
+        .to change { AuditEvent.where(action: "passkey.enrolled_after_recovery", actor: analyst, subject: analyst).count }.by(1)
 
       expect(response).to redirect_to("http://www.example.com/analyst")
       expect(analyst.passkeys.count).to eq(2)
@@ -267,8 +264,8 @@ RSpec.describe "Passkey flow", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it "lets a recovered session sign out" do
-      code = analyst.generate_recovery_codes!.first
+    it "lets a recovered session sign out, here or everywhere" do
+      code, other_code = analyst.generate_recovery_codes!
       sign_in(analyst)
       post recovery_code_path, params: { code: code }
 
@@ -276,6 +273,24 @@ RSpec.describe "Passkey flow", type: :request do
 
       expect(response).to redirect_to(login_path)
       expect(analyst.sessions).to be_empty
+
+      other = analyst.sessions.create!(passkey_verified: true)
+      sign_in(analyst)
+      post recovery_code_path, params: { code: other_code }
+
+      delete sessions_path
+
+      expect(response).to redirect_to(login_path)
+      expect(Session.exists?(other.id)).to be(false)
+      expect(analyst.sessions).to be_empty
+    end
+
+    it "records no audit event for a passkey added from a session verified with a passkey" do
+      sign_in_with_passkey(analyst)
+
+      expect { register_passkey(nickname: "Second appareil", authenticator: WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin)) }
+        .not_to change(AuditEvent, :count)
+      expect(analyst.passkeys.count).to eq(2)
     end
 
     it "lets a pending staff member sign out of this session, not everywhere" do

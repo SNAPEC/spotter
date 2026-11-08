@@ -59,6 +59,7 @@ class Session < ApplicationRecord
       end
 
       Passkey.register!(user: user, credential: credential, challenge: challenge, nickname: nickname)
+      AuditEvent.record!(actor: user, action: "passkey.enrolled_after_recovery", subject: user) if recovered?
       update!(passkey_verified: true, recovered: false)
       user.recovery_codes.exists? ? [] : user.generate_recovery_codes!
     end
