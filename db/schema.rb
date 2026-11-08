@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_08_180001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_090003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -50,6 +50,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_180001) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "taxonomy_fields", force: :cascade do |t|
+    t.bigint "taxonomy_version_id", null: false
+    t.string "code", null: false
+    t.string "group", null: false
+    t.string "kind", null: false
+    t.string "scope", null: false
+    t.integer "position", null: false
+    t.string "label", null: false
+    t.index ["taxonomy_version_id", "code"], name: "index_taxonomy_fields_on_taxonomy_version_id_and_code", unique: true
+    t.index ["taxonomy_version_id"], name: "index_taxonomy_fields_on_taxonomy_version_id"
+    t.check_constraint "kind::text = ANY (ARRAY['single'::character varying, 'multi'::character varying, 'text'::character varying, 'integer'::character varying]::text[])", name: "taxonomy_fields_kind_check"
+    t.check_constraint "scope::text = ANY (ARRAY['report'::character varying, 'casualty'::character varying]::text[])", name: "taxonomy_fields_scope_check"
+  end
+
+  create_table "taxonomy_options", force: :cascade do |t|
+    t.bigint "taxonomy_field_id", null: false
+    t.string "code", null: false
+    t.string "label", null: false
+    t.text "definition"
+    t.integer "position", null: false
+    t.index ["taxonomy_field_id", "code"], name: "index_taxonomy_options_on_taxonomy_field_id_and_code", unique: true
+    t.index ["taxonomy_field_id"], name: "index_taxonomy_options_on_taxonomy_field_id"
+  end
+
+  create_table "taxonomy_versions", force: :cascade do |t|
+    t.integer "number", null: false
+    t.datetime "published_at"
+    t.index ["number"], name: "index_taxonomy_versions_on_number", unique: true
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", null: false
     t.string "role", default: "declarant", null: false
@@ -66,4 +96,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_180001) do
   add_foreign_key "passkeys", "users"
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "sessions", "users"
+  add_foreign_key "taxonomy_fields", "taxonomy_versions"
+  add_foreign_key "taxonomy_options", "taxonomy_fields"
 end

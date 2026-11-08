@@ -7,3 +7,6 @@
 #   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
 #     MovieGenre.find_or_create_by!(name: genre_name)
 #   end
+
+taxonomy_path = Rails.root.join("db/seeds/taxonomy_v0.yml")
+TaxonomyVersion.import!(taxonomy_path).publish! unless TaxonomyVersion.exists?(number: 0)

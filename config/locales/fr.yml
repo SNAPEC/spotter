@@ -29,6 +29,14 @@ fr:
     consume:
       invalid: "Ce lien n’est plus valable. Demandez-en un nouveau."
   errors:
+    format: "%{attribute} %{message}"
+    messages:
+      blank: "doit être renseigné"
+      inclusion: "n’est pas inclus dans la liste"
+      taken: "est déjà utilisé"
+      required: "doit exister"
+      invalid: "n’est pas valide"
+      record_invalid: "La validation a échoué : %{errors}"
     forbidden:
       title: "Accès refusé"
       body: "Vous n’avez pas les droits nécessaires pour consulter cette page."
@@ -104,6 +112,10 @@ fr:
       too_many_requests: "Trop d’essais. Réessayez dans quelques minutes."
   activerecord:
     errors:
+      messages:
+        record_invalid: "La validation a échoué : %{errors}"
+        no_fields: "Une version sans champ ne peut pas être publiée."
+        published_version: "Une version publiée de la taxonomie est immuable."
       models:
         user:
           attributes:
