@@ -70,7 +70,7 @@ RSpec.describe ClarificationMailer, type: :mailer do
     it "raises an error that names neither the address nor the user" do
       expect { described_class.digest(user).deliver_now }.to raise_error(ApplicationMailer::DeliveryFailed) { |error|
         expect(error.cause).to be_nil
-        expect(error.message).to eq("ApplicationMailer::DeliveryFailed")
+        expect(error.message).to eq("Net::SMTPFatalError")
         expect(error.full_message(highlight: false)).not_to include("lea.martin", "unknown recipient")
       }
     end

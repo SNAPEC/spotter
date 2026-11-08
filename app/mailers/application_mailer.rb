@@ -5,9 +5,9 @@ class ApplicationMailer < ActionMailer::Base
   layout "mailer"
   self.delivery_job = ApplicationMailDeliveryJob
 
-  # A delivery error usually quotes the recipient: re-raised as is, it would land in the job log and in
-  # Sentry next to the user's GlobalID. It is replaced by a bare error, without its cause.
-  rescue_from "Net::SMTPError", "OpenSSL::SSL::SSLError", IOError, SocketError, SystemCallError, Timeout::Error do
-    raise DeliveryFailed, cause: nil
+  # A delivery error usually quotes the recipient: re-raised as is, it would reach the job log and
+  # Sentry. It is replaced by an error that names only the original class, without its cause.
+  rescue_from StandardError do |error|
+    raise DeliveryFailed, error.class.name, cause: nil
   end
 end
