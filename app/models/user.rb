@@ -1,6 +1,7 @@
 class User < ApplicationRecord
   ROLES = %w[declarant analyst admin].freeze
   MINIMUM_ADMINS = 2
+  ENROLLMENT_CODE_VALIDITY = 7.days
 
   class PasskeyResetNotAllowed < StandardError; end
   class EnrollmentNotAllowed < StandardError; end
@@ -94,20 +95,28 @@ class User < ApplicationRecord
 
     RecoveryCode.generate_one.tap do |code|
       transaction do
-        update!(enrollment_code_digest: RecoveryCode.digest(code, purpose: :enrollment_code))
+        update!(
+          enrollment_code_digest: RecoveryCode.digest(code, purpose: :enrollment_code),
+          enrollment_code_expires_on: Date.current + ENROLLMENT_CODE_VALIDITY
+        )
         AuditEvent.record!(actor: by, action: "enrollment_code.issued", subject: self)
       end
     end
   end
 
-  # Compare-and-swap on the digest: one statement checks and burns the code.
+  # Compare-and-swap on the digest: one statement checks and burns the code. Valid through its expiry day.
   def consume_enrollment_code!(code)
     return false if RecoveryCode.normalize(code).empty?
 
     consumed = User.where(id: id, enrollment_code_digest: RecoveryCode.digest(code, purpose: :enrollment_code))
-      .update_all(enrollment_code_digest: nil) == 1
-    self.enrollment_code_digest = nil if consumed
+      .where(enrollment_code_expires_on: Date.current..)
+      .update_all(enrollment_code_digest: nil, enrollment_code_expires_on: nil) == 1
+    self.enrollment_code_digest = self.enrollment_code_expires_on = nil if consumed
     consumed
+  end
+
+  def enrollment_code_expired?
+    enrollment_code_digest.present? && enrollment_code_expires_on < Date.current
   end
 
   def staff?

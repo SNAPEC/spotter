@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_08_170002) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_08_180001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -56,6 +56,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_08_170002) do
     t.date "membership_expires_on"
     t.integer "login_token_version", default: 0, null: false
     t.string "enrollment_code_digest"
+    t.date "enrollment_code_expires_on"
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["enrollment_code_digest"], name: "index_users_on_enrollment_code_digest", unique: true
     t.check_constraint "role::text = ANY (ARRAY['declarant'::character varying, 'analyst'::character varying, 'admin'::character varying]::text[])", name: "users_role_check"

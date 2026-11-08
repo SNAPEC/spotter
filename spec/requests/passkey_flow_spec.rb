@@ -2,6 +2,8 @@ require "rails_helper"
 require "webauthn/fake_client"
 
 RSpec.describe "Passkey flow", type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:client) { WebAuthn::FakeClient.new(Rails.configuration.x.webauthn.origin) }
   let(:analyst) { User.create!(email: "analyste@example.com", role: "analyst") }
   let(:admin) { User.create!(email: "admin@example.com", role: "admin") }
@@ -131,6 +133,22 @@ RSpec.describe "Passkey flow", type: :request do
       expect(analyst.passkeys).to be_empty
       get "/analyst"
       expect(response).to redirect_to(new_passkey_registration_path)
+    end
+
+    it "refuses an expired code and says to ask for a new one" do
+      code = nil
+      travel_to(Date.new(2026, 11, 10)) { code = analyst.issue_enrollment_code!(by: issuer) }
+
+      travel_to(Date.new(2026, 11, 18)) do
+        sign_in(analyst)
+        get new_passkey_registration_path
+        expect(response.body).to include("Votre code d’enrôlement a expiré")
+        expect(response.body).not_to include(%(name="credential"))
+
+        register_passkey(enrollment_code: code)
+        expect(response).to redirect_to(new_passkey_registration_path)
+        expect(analyst.passkeys).to be_empty
+      end
     end
 
     it "works once" do

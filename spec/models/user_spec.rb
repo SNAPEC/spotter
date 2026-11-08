@@ -250,6 +250,29 @@ RSpec.describe User, type: :model do
       expect(analyst.enrollment_code_digest).not_to eq(RecoveryCode.digest(old_code, purpose: :enrollment_code))
     end
 
+    it "expires at the end of the seventh day after issue" do
+      code = nil
+      travel_to(Date.new(2026, 11, 10)) { code = analyst.issue_enrollment_code!(by: admin) }
+
+      expect(analyst.enrollment_code_expires_on).to eq(Date.new(2026, 11, 17))
+      travel_to(Time.zone.local(2026, 11, 18, 0, 1)) do
+        expect(analyst.consume_enrollment_code!(code)).to be(false)
+        expect(analyst).to be_enrollment_code_expired
+      end
+      travel_to(Time.zone.local(2026, 11, 17, 23, 59)) do
+        expect(analyst).not_to be_enrollment_code_expired
+        expect(analyst.consume_enrollment_code!(code)).to be(true)
+      end
+      expect(analyst.reload).to have_attributes(enrollment_code_digest: nil, enrollment_code_expires_on: nil)
+    end
+
+    it "restarts the 7 days on re-issue" do
+      travel_to(Date.new(2026, 11, 10)) { analyst.issue_enrollment_code!(by: admin) }
+      travel_to(Date.new(2026, 11, 15)) { analyst.issue_enrollment_code!(by: admin) }
+
+      expect(analyst.reload.enrollment_code_expires_on).to eq(Date.new(2026, 11, 22))
+    end
+
     it "lets an admin bootstrap their own enrollment from the console" do
       expect { admin.issue_enrollment_code!(by: admin) }.not_to raise_error
     end

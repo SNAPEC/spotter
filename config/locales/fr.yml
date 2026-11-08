@@ -59,7 +59,7 @@ fr:
       create:
         title: "Code d’enrôlement"
         body: "Les passkeys et les codes de secours de %{email} sont supprimés. Transmettez-lui ce code d’enrôlement par un autre canal que l’e-mail : il lui sera demandé pour enregistrer une nouvelle passkey."
-        once: "Ce code ne sera plus affiché. Il ne sert qu’une fois."
+        once: "Ce code ne sera plus affiché. Il ne sert qu’une fois et expire dans 7 jours."
         back: "Retour à l’administration"
         not_allowed: "Vous ne pouvez pas réinitialiser vos propres passkeys."
   roles:
@@ -73,6 +73,7 @@ fr:
       nickname: "Nom de l’appareil"
       enrollment_code: "Code d’enrôlement"
       ask_for_enrollment_code: "Demandez un code d’enrôlement à un administrateur. Il vous sera demandé pour enregistrer votre première passkey."
+      enrollment_code_expired: "Votre code d’enrôlement a expiré (il est valable 7 jours). Demandez-en un nouveau à un administrateur."
       submit: "Enregistrer une passkey"
       browser_failed: "L’enregistrement n’a pas abouti. Réessayez, ou essayez un autre navigateur."
     create:

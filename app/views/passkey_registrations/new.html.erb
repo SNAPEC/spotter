@@ -7,6 +7,8 @@
 
   <% if Current.session.needs_enrollment_code? && Current.user.enrollment_code_digest.nil? %>
     <p class="mt-6 py-2 px-3 bg-yellow-50 text-yellow-900 rounded" role="status"><%= t(".ask_for_enrollment_code") %></p>
+  <% elsif Current.session.needs_enrollment_code? && Current.user.enrollment_code_expired? %>
+    <p class="mt-6 py-2 px-3 bg-yellow-50 text-yellow-900 rounded" role="status"><%= t(".enrollment_code_expired") %></p>
   <% else %>
     <%= form_with url: passkey_registration_path, class: "mt-6 space-y-4",
       data: { turbo: false, controller: "webauthn", action: "webauthn#start",
