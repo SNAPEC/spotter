@@ -94,7 +94,7 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 À trancher avec Hugo avant l'écran concerné.
 
 1. **Le codage par l'analyste.** Aucune méthode n'enregistre les corrections de l'analyste sur les propositions (`Analysis#modifications`, statut `reviewed`), ni le codage à la main après une analyse `failed`, ni la mise à jour des colonnes et des `answers` d'un rapport soumis. Bloque la fiche analyste au-delà de la lecture.
-2. **Le récit anonymisé.** Prévu par la conception, absent du schéma : à la validation, il ne reste que les réponses codées.
+2. **Le récit anonymisé.** Absent du schéma : à la validation, il ne reste aujourd'hui que les réponses codées. Décidé : l'analyste rédige un texte anonymisé, exigé par `validate!` (sauf récit déjà purgé) et seul texte conservé après la validation. Le LLM le pré-remplira peut-être, selon la calibration ; l'écran prévoit un champ pré-rempli ou vide.
 3. **Les valeurs du formulaire.** Un formulaire envoie des chaînes : un champ `integer` arrive en `"3"`, refusé (`not_an_integer`) ; un choix laissé vide arrive en `""`, refusé (`invalid_option`). Il faut convertir et nettoyer dans le modèle avant la validation.
 4. **« Encore modifiable ? »** Pas de prédicat pour afficher ou non le lien de modification. La condition est dans `edit_submitted!` ; une méthode publique du modèle doit la porter, pas la vue.
 5. **Un brouillon complet.** `submit!` accepte un brouillon vide. Décidé : seuls le type d'événement et un récit non vide seront obligatoires ; `submit!` refusera sinon, avec une erreur par champ (méthode à venir).
