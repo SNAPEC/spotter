@@ -146,25 +146,24 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
   end
 
   describe "editing window" do
-    it "opens on submission for as long as the ownership" do
-      expect(report.editable_until).to eq(Date.new(2027, 1, 16))
-      expect(report.editable_until).to eq(report.report_ownership.cutoff_on)
+    it "opens on submission and ends the day before the ownership cutoff" do
+      expect(report.editable_until).to eq(Date.new(2027, 1, 15))
+      expect(report.editable_until).to eq(report.report_ownership.cutoff_on - 1)
     end
 
-    it "lets the anonymous declarant edit up to day 60 after submission, not after" do
+    it "lets the anonymous declarant edit through day 59 after submission, not from day 60" do
       anonymous, code = submitted(mode: "anonymous")
 
-      travel_to(Date.new(2027, 1, 16)) { anonymous.edit_submitted!(edit, tracking_code: code) }
-      travel_to(Date.new(2027, 1, 17)) do
-        expect { anonymous.edit_submitted!({ event_type: "accident" }, tracking_code: code) }.to raise_error(Report::InvalidTransition)
+      travel_to(Date.new(2027, 1, 15)) { anonymous.edit_submitted!(edit, tracking_code: code) }
+      [ Date.new(2027, 1, 16), Date.new(2027, 1, 17) ].each do |day|
+        travel_to(day) { expect { anonymous.edit_submitted!({ event_type: "accident" }, tracking_code: code) }.to raise_error(Report::InvalidTransition) }
       end
       expect(anonymous.reload).to have_attributes(event_type: "incident", content_revision: 1)
     end
 
-    # The authorship link goes on its cutoff day, which is also the window's last day: the confidential
-    # declarant is no longer recognised from that day on.
-    it "lets the confidential declarant edit until the authorship link goes" do
-      expect(report.editable_until).to eq(Date.new(2027, 1, 16))
+    # From day 60 the authorship link is no longer live: the confidential declarant is not recognised.
+    it "lets the confidential declarant edit through day 59 after submission, not from day 60" do
+      expect(report.editable_until).to eq(Date.new(2027, 1, 15))
       travel_to(Date.new(2027, 1, 15)) { report.edit_submitted!(edit, user: user) }
       [ Date.new(2027, 1, 16), Date.new(2027, 1, 17) ].each do |day|
         travel_to(day) { expect { report.edit_submitted!({ event_type: "accident" }, user: user) }.to raise_error(Report::NotAllowed) }
