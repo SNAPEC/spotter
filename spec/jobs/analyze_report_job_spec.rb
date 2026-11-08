@@ -48,6 +48,27 @@ RSpec.describe AnalyzeReportJob, type: :job do
     expect(report.reload).to be_in_validation
   end
 
+  context "when the extractor keeps failing" do
+    around do |example|
+      original = Rails.configuration.x.llm_extractor
+      failing = Llm::FakeExtractor.new
+      def failing.extract(text:, schema:) = raise(Timeout::Error, "upstream echoed: #{text}")
+      Rails.configuration.x.llm_extractor = failing
+      example.run
+    ensure
+      Rails.configuration.x.llm_extractor = original
+    end
+
+    it "records a failed analysis after its last attempt and hands the report over, once" do
+      report.submit!
+      5.times { perform_enqueued_jobs }
+      described_class.perform_now(report)
+
+      expect(Analysis.where(report_id: report.id).sole).to have_attributes(status: "failed", proposals: {})
+      expect(report.reload).to be_in_validation
+    end
+  end
+
   it "is discarded when the report no longer exists" do
     report.submit!
     report.destroy!

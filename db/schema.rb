@@ -26,7 +26,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_110002) do
     t.index ["report_id", "prompt_version"], name: "index_analyses_on_report_id_and_prompt_version", unique: true
     t.index ["report_id"], name: "index_analyses_on_report_id"
     t.check_constraint "provider::text = ANY (ARRAY['fake'::character varying::text, 'scaleway'::character varying::text])", name: "analyses_provider_check"
-    t.check_constraint "status::text = ANY (ARRAY['proposed'::character varying::text, 'reviewed'::character varying::text])", name: "analyses_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['proposed'::character varying::text, 'reviewed'::character varying::text, 'failed'::character varying::text])", name: "analyses_status_check"
   end
 
   create_table "audit_events", force: :cascade do |t|

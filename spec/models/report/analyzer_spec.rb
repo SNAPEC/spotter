@@ -53,6 +53,47 @@ RSpec.describe Report::Analyzer, type: :model do
       expect(Analysis.where(report_id: report.id)).to be_empty
     end
 
+    it "closes the schema at every level" do
+      schemas = []
+      extractor = Llm::FakeExtractor.new
+      extractor.define_singleton_method(:extract) { |text:, schema:| schemas << schema; super(text: text, schema: schema) }
+      analyze(extractor)
+
+      schema = schemas.sole
+      expect(schema).to include("additionalProperties" => false, "required" => schema["properties"].keys)
+      schema["properties"].each_value do |property|
+        expect(property).to include("additionalProperties" => false, "required" => %w[value excerpt])
+      end
+    end
+
+    {
+      "an extra key" => ->(proposals) { proposals["weather"]["quote"] = "Chute fictive au deuxième point" },
+      "a non-string excerpt" => ->(proposals) { proposals["weather"]["excerpt"] = [ "Chute fictive" ] },
+      "a missing excerpt" => ->(proposals) { proposals["weather"].delete("excerpt") },
+      "a missing field" => ->(proposals) { proposals.delete("weather") },
+      "a proposal that is not an object" => ->(proposals) { proposals["weather"] = "good" }
+    }.each do |label, tamper|
+      it "refuses #{label} and keeps the report in analysis" do
+        extractor = Llm::FakeExtractor.new
+        extractor.define_singleton_method(:extract) { |text:, schema:| super(text: text, schema: schema).tap(&tamper) }
+
+        expect { analyze(extractor) }.to raise_error(Report::Analyzer::InvalidProposals)
+        expect(Analysis.where(report_id: report.id)).to be_empty
+        expect(report.reload).to be_analyzing
+      end
+    end
+
+    it "hides the extractor's own error, which may quote the narrative" do
+      extractor = Llm::FakeExtractor.new
+      def extractor.extract(text:, schema:) = raise(IOError, "upstream echoed: #{text}")
+
+      expect { analyze(extractor) }.to raise_error(Report::Analyzer::ExtractionFailed) { |error|
+        expect(error.cause).to be_nil
+        expect(error.message).not_to include("Chute fictive")
+      }
+      expect(report.reload).to be_analyzing
+    end
+
     it "refuses proposals outside the schema and keeps the report in analysis" do
       extractor = Llm::FakeExtractor.new
       def extractor.extract(text:, schema:) = { "weather" => { "value" => "snowstorm", "excerpt" => "x" } }
@@ -63,7 +104,45 @@ RSpec.describe Report::Analyzer, type: :model do
     end
   end
 
+  describe "#record_failure" do
+    it "records a failed analysis without proposals and hands the report over for manual coding, once" do
+      report.start_analysis!
+      first = described_class.new.record_failure(report)
+      second = described_class.new.record_failure(report)
+
+      expect(second).to eq(first)
+      expect(first).to have_attributes(status: "failed", provider: "fake", proposals: {})
+      expect(Analysis.where(report_id: report.id).count).to eq(1)
+      expect(report.reload).to be_in_validation
+    end
+
+    it "also takes a report still waiting for its analysis" do
+      expect(described_class.new.record_failure(report).status).to eq("failed")
+      expect(report.reload).to be_in_validation
+    end
+
+    it "leaves a decided report alone" do
+      report.reject!(analyst)
+
+      expect(described_class.new.record_failure(report)).to be_nil
+      expect(Analysis.where(report_id: report.id)).to be_empty
+    end
+  end
+
   describe "Analysis#strip_raw_excerpts!" do
+    it "keeps only the value of each proposal, whatever else was stored" do
+      analysis = analyze
+      analysis.update!(proposals: analysis.proposals.merge("weather" => { "value" => "good", "excerpt" => "x", "quote" => "Chute fictive" }, "odd" => "Chute fictive"))
+
+      analysis.strip_raw_excerpts!
+
+      stored = Analysis.find(analysis.id).proposals
+      expect(stored["weather"]).to eq("value" => "good")
+      expect(stored["odd"]).to eq({})
+      expect(Analysis.where(id: analysis.id).pick(Arel.sql("proposals::text"))).not_to include("Chute fictive", "quote", "excerpt")
+    end
+
+
     it "leaves no excerpt and no modification, and keeps the coded values" do
       analysis = analyze
       analysis.update!(modifications: { "anonymized_text" => raw_text })

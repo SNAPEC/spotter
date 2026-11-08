@@ -1,6 +1,6 @@
 # The extractor's coded proposals for a report, then the analyst's changes and decisions on them.
 class Analysis < ApplicationRecord
-  STATUSES = %w[proposed reviewed].freeze
+  STATUSES = %w[proposed reviewed failed].freeze
   PROVIDERS = %w[fake scaleway].freeze
 
   belongs_to :report
@@ -10,16 +10,8 @@ class Analysis < ApplicationRecord
   validates :model, :prompt_version, presence: true
 
   # Excerpts quote the declarant's narrative, and modifications may too: neither outlives the decision.
+  # Only each proposal's coded value is kept, whatever else was stored.
   def strip_raw_excerpts!
-    update!(proposals: without_excerpts(proposals), modifications: {})
+    update!(proposals: proposals.transform_values { |proposal| proposal.is_a?(Hash) ? proposal.slice("value") : {} }, modifications: {})
   end
-
-  private
-    def without_excerpts(value)
-      case value
-      when Hash then value.except("excerpt").transform_values { |item| without_excerpts(item) }
-      when Array then value.map { |item| without_excerpts(item) }
-      else value
-      end
-    end
 end
