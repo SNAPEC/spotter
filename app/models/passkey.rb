@@ -23,6 +23,7 @@ class Passkey < ApplicationRecord
     WebAuthn::Credential.options_for_get(allow: user.passkeys.pluck(:external_id), user_verification: "required")
   end
 
+  # JSON::ParserError too: the gem parses the decoded clientDataJSON itself.
   # The unique index on external_id, not a validation, settles two concurrent submits of one credential.
   def self.register!(user:, credential:, challenge:, nickname: nil)
     attestation = WebAuthn::Credential.from_create(parse(credential, :create))
@@ -34,7 +35,7 @@ class Passkey < ApplicationRecord
       sign_count: attestation.sign_count,
       nickname: nickname.presence
     )
-  rescue WebAuthn::Error, ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => error
+  rescue WebAuthn::Error, JSON::ParserError, ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => error
     raise InvalidCredential, error.class.name
   end
 
@@ -46,7 +47,7 @@ class Passkey < ApplicationRecord
     assertion.verify(challenge, public_key: passkey.public_key, sign_count: passkey.sign_count, user_verification: true)
     passkey.update!(sign_count: assertion.sign_count)
     passkey
-  rescue WebAuthn::Error, InvalidCredential
+  rescue WebAuthn::Error, JSON::ParserError, InvalidCredential
     nil
   end
 

@@ -57,7 +57,8 @@ RSpec.describe Passkey, type: :model do
         { type: "public-key", id: "eA", rawId: "eA", response: {} }.to_json,
         { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: 1, attestationObject: [] } }.to_json,
         { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: "@@@", attestationObject: "@@@" } }.to_json,
-        { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: "e30", attestationObject: "AAAA" } }.to_json
+        { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: "e30", attestationObject: "AAAA" } }.to_json,
+        { type: "public-key", id: "eA", rawId: "eA", response: { clientDataJSON: "AAAA", attestationObject: "AAAA" } }.to_json
       ].each do |malformed|
         expect { Passkey.register!(user: user, credential: malformed, challenge: "abc") }
           .to raise_error(Passkey::InvalidCredential), malformed
@@ -121,7 +122,11 @@ RSpec.describe Passkey, type: :model do
     end
 
     it "refuses a malformed credential" do
-      [ "nope", "{}", "[]", { type: "public-key", id: "eA", rawId: "eA", response: { signature: 1 } }.to_json ].each do |malformed|
+      passkey = register(user, client: client)
+      not_json = { type: "public-key", id: passkey.external_id, rawId: passkey.external_id,
+                   response: { clientDataJSON: "AAAA", authenticatorData: "AAAA", signature: "AAAA" } }.to_json
+
+      [ "nope", "{}", "[]", { type: "public-key", id: "eA", rawId: "eA", response: { signature: 1 } }.to_json, not_json ].each do |malformed|
         expect(Passkey.authenticate(user: user, credential: malformed, challenge: "abc")).to be_nil
       end
     end
