@@ -10,7 +10,11 @@ class CspReportsController < ApplicationController
     with: -> { head :too_many_requests },
     store: Rails.configuration.x.rate_limit_store || cache_store
 
+  MAX_BODY_BYTES = 16.kilobytes
+
   def create
+    return head :content_too_large if request.content_length.to_i > MAX_BODY_BYTES
+
     Rails.logger.warn("CSP violation: #{CspViolation.summary(request.raw_post)}")
     head :no_content
   end

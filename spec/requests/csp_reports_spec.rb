@@ -68,6 +68,13 @@ RSpec.describe "CSP violation reports", type: :request do
     expect(io.string.scan("directive=unknown blocked=unknown").size).to eq(2)
   end
 
+  it "refuses a body over the limit from its declared length, without reading it" do
+    send_report(report("inline") + (" " * 17.kilobytes))
+
+    expect(response).to have_http_status(:content_too_large)
+    expect(io.string).not_to include("CSP violation")
+  end
+
   it "is rate limited per client" do
     20.times { send_report(report("inline")) }
     expect(response).to have_http_status(:no_content)
