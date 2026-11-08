@@ -19,7 +19,7 @@ RSpec.describe "Request logging", type: :request do
 
     logger.tagged(id) { logger.info("Report #{id}") }
 
-    expect(Rails.logger.broadcasts).to all(satisfy { |each| each.formatter.is_a?(NoIpLogging::Formatter) })
+    expect(Rails.logger.broadcasts).to all(satisfy { |each| each.formatter.is_a?(Logstop::Formatter) })
     expect(io.string).to eq("[#{id}] Report [FILTERED]\n")
   end
 
@@ -46,6 +46,24 @@ RSpec.describe "Request logging", type: :request do
     expect(io.string.scan('Started GET "/login/[FILTERED]"').size).to eq(1)
     expect(io.string.scan('Started POST "/login/[FILTERED]"').size).to eq(1)
     expect(io.string).not_to include(token)
+  end
+
+  it "masks the magic link token in a routing error too" do
+    token = User.create!(email: "lea.martin@example.com").magic_link_token
+
+    get "/login/#{token}/extra"
+
+    expect(io.string).to include('No route matches [GET] "/login/[FILTERED]/extra"')
+    expect(io.string).not_to include(token)
+  end
+
+  it "masks an exception passed to the logger as is" do
+    id = SecureRandom.uuid
+
+    Rails.logger.error(ArgumentError.new("Couldn't process Report #{id} for lea.martin@example.com"))
+
+    expect(io.string).to include("ArgumentError", "Couldn't process Report [FILTERED] for [FILTERED]")
+    expect(io.string).not_to include(id)
   end
 
   it "masks any id in the request line, including on a 404" do

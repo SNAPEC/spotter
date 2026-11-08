@@ -3,30 +3,30 @@
 Rails.application.config.log_tags = [ :request_id ]
 
 module NoIpLogging
-  # Job ids are random and point to no record: kept so a job can be followed from enqueue to perform.
-  UUID = /(?<!Job ID: |active_job_id: ")\h{8}-\h{4}-\h{4}-\h{4}-\h{12}/i
-  FILTERED = "[FILTERED]"
+  UUID = /\h{8}-\h{4}-\h{4}-\h{4}-\h{12}/i
+  LOGIN_TOKEN = %r{(/login/)[^\s/?#"'<>]+}
+  # Logstop scrubs the whole formatted line: the leading tags (request id, job id) are left out of it,
+  # so a request or a job can still be followed.
+  TAGS = /\A(?:\[[^\]\n]*\] )*/
 
-  # Masks every message before the tags are added, so the request id tag stays.
-  module Formatter
-    def call(severity, time, progname, msg)
-      super(severity, time, progname, msg.is_a?(String) ? msg.gsub(UUID, FILTERED) : msg)
-    end
+  SCRUBBER = lambda do |line|
+    tags = line[TAGS]
+    tags + line.delete_prefix(tags).gsub(UUID, Logstop::FILTERED_STR).gsub(LOGIN_TOKEN, "\\1#{Logstop::FILTERED_STR}")
   end
 
+  # Logstop's default rules (emails, phone numbers, URL passwords...) are kept, IPv4 addresses added.
   def self.install(logger)
-    logger.formatter ||= ActiveSupport::Logger::SimpleFormatter.new
-    logger.formatter.extend(Formatter)
+    Logstop.guard(logger, ip: true, scrubber: SCRUBBER)
     logger
   end
 
+  # Rails logs the client IP on the request line, IPv6 included, which Logstop does not catch.
   module RequestLine
     private
 
     # Overrides a private Rails 8.1 method: re-check it when upgrading Rails.
     def started_request_message(request)
-      path = request.filtered_path.sub(%r{\A/login/[^/?]+}, "/login/#{FILTERED}")
-      format('Started %s "%s" at %s', request.raw_request_method, path, Time.now)
+      format('Started %s "%s" at %s', request.raw_request_method, request.filtered_path, Time.now)
     end
   end
 end

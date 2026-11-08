@@ -65,6 +65,9 @@ gem "rspec-rails", "~> 8.1", groups: [ :development, :test ]
 # Passkeys (WebAuthn) for staff second factor
 gem "webauthn", "~> 3.4"
 
+# Scrubs personal data and ids from every log line, at the logger formatter
+gem "logstop", "~> 1.0"
+
 group :test do
   gem "capybara"
   gem "selenium-webdriver"
