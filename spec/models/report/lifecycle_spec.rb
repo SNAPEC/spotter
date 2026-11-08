@@ -147,6 +147,26 @@ RSpec.describe Report::Lifecycle, type: :model do
       end
     end
 
+    %i[validate! reject!].each do |decision|
+      it "refuses excerpts and modifications written back to the analysis after #{decision}" do
+        report = in_validation
+        report.public_send(decision, analyst)
+        analysis = Analysis.find(report.analyses.sole.id)
+        kept = analysis.proposals
+
+        expect { analysis.update!(modifications: { "anonymized_text" => "Récit fictif réinjecté" }) }.to raise_error(ActiveRecord::RecordInvalid)
+        analysis.reload
+        expect { analysis.update!(proposals: kept.merge("cause" => { "value" => "other", "excerpt" => "Récit fictif" })) }
+          .to raise_error(ActiveRecord::RecordInvalid)
+        analysis.reload
+        expect { analysis.update!(proposals: kept.merge("odd" => "Récit fictif")) }.to raise_error(ActiveRecord::RecordInvalid)
+        analysis.reload
+        expect { analysis.update!(status: "reviewed", proposals: kept.merge("cause" => { "value" => "other" })) }.not_to raise_error
+        expect(Analysis.find(analysis.id).modifications).to be_empty
+        expect(Analysis.find(analysis.id).proposals.to_s).not_to include("Récit fictif")
+      end
+    end
+
     it "refuses a status change outside the lifecycle" do
       report = in_validation
 

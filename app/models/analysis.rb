@@ -8,10 +8,19 @@ class Analysis < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :provider, inclusion: { in: PROVIDERS }
   validates :model, :prompt_version, presence: true
+  validate :only_coded_values_once_decided
 
   # Excerpts quote the declarant's narrative, and modifications may too: neither outlives the decision.
   # Only each proposal's coded value is kept, whatever else was stored.
   def strip_raw_excerpts!
     update!(proposals: proposals.transform_values { |proposal| proposal.is_a?(Hash) ? proposal.slice("value") : {} }, modifications: {})
   end
+
+  private
+    # Checked against the stored status, like Narrative: a stale copy must not bring excerpts back.
+    def only_coded_values_once_decided
+      return if modifications.blank? && proposals.to_h.values.all? { |proposal| proposal.is_a?(Hash) && (proposal.keys - [ "value" ]).empty? }
+
+      errors.add(:report, :invalid) if Report.decided.exists?(report_id)
+    end
 end
