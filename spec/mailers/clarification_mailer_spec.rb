@@ -116,9 +116,12 @@ RSpec.describe ClarificationMailer, type: :mailer do
       notified_report
       allow(Report).to receive(:reopen_declarant_notices).and_raise(ActiveRecord::StatementInvalid, "SQL lea.martin")
 
-      Rails.logger.broadcast_to(logger)
-      expect { 3.times { perform_enqueued_jobs } }.not_to raise_error
-      Rails.logger.stop_broadcasting_to(logger)
+      begin
+        Rails.logger.broadcast_to(logger)
+        expect { 3.times { perform_enqueued_jobs } }.not_to raise_error
+      ensure
+        Rails.logger.stop_broadcasting_to(logger)
+      end
 
       expect(io.string).to include("ClarificationMailDeliveryJob: delivery_abandoned failed with ActiveRecord::StatementInvalid")
       expect(io.string).not_to include("lea.martin", user.to_global_id.to_s)
