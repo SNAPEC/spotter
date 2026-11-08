@@ -38,12 +38,21 @@ class Session < ApplicationRecord
 
   # The first passkey needs the enrollment code an admin handed over: the magic link alone is not enough.
   # Returns the recovery codes when the user had none left, else an empty array.
+  #
+  # The user row lock serialises enrolment with User#reset_passkeys! and User#deactivate!, which take
+  # the same lock: a reset either waits and then deletes the new passkey, or wins and leaves this
+  # session gone. Every check is therefore repeated under the lock.
   def register_passkey!(credential:, nickname: nil, enrollment_code: nil)
     raise Passkey::InvalidCredential, "deactivated account" if user.deactivated?
     raise Passkey::InvalidCredential, "session not verified" unless may_register_passkey?
     challenge = consume_webauthn_challenge!
 
     transaction do
+      user.lock!
+      raise Passkey::InvalidCredential, "session revoked" unless Session.exists?(id)
+      raise Passkey::InvalidCredential, "deactivated account" if user.deactivated?
+      raise Passkey::InvalidCredential, "session not verified" unless may_register_passkey?
+
       if needs_enrollment_code? && !user.consume_enrollment_code!(enrollment_code)
         raise Passkey::InvalidCredential, "invalid enrollment code"
       end

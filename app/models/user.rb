@@ -85,6 +85,8 @@ class User < ApplicationRecord
 
     transaction do
       raise PasskeyResetNotAllowed unless acting_admin?(by)
+      lock_for_passkey_change!
+      raise PasskeyResetNotAllowed unless staff? && active?
 
       passkeys.delete_all
       recovery_codes.delete_all
@@ -134,6 +136,7 @@ class User < ApplicationRecord
 
     transaction do
       raise DeactivationNotAllowed unless acting_admin?(by)
+      lock_for_passkey_change!
       raise TooFewAdmins if admin? && active? && other_admins_count < MINIMUM_ADMINS
 
       deactivated = User.active.where(id: id)
@@ -171,6 +174,12 @@ class User < ApplicationRecord
     def acting_admin?(by)
       User.where(role: "admin").order(:id).lock.pluck(:id)
       by.reload.then { |actor| actor.admin? && actor.active? }
+    end
+
+    # Serialises with Session#register_passkey!, which locks the same row. Taken after the admin rows
+    # (acting_admin?), never before, so two admins acting on each other cannot deadlock.
+    def lock_for_passkey_change!
+      lock!
     end
 
     def keeps_enough_admins
