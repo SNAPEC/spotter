@@ -1,4 +1,9 @@
 fr:
+  activerecord:
+    errors:
+      messages:
+        record_invalid: "La validation a échoué : %{errors}"
+        published_version: "Une version publiée de la taxonomie est immuable."
   magic_link_mailer:
     sign_in:
       subject: "Votre lien de connexion à Spotter"
@@ -29,6 +34,14 @@ fr:
     consume:
       invalid: "Ce lien n’est plus valable. Demandez-en un nouveau."
   errors:
+    format: "%{attribute} %{message}"
+    messages:
+      blank: "doit être renseigné"
+      inclusion: "n’est pas inclus dans la liste"
+      taken: "est déjà utilisé"
+      required: "doit exister"
+      invalid: "n’est pas valide"
+      record_invalid: "La validation a échoué : %{errors}"
     forbidden:
       title: "Accès refusé"
       body: "Vous n’avez pas les droits nécessaires pour consulter cette page."
