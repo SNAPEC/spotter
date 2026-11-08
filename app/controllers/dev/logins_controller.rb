@@ -6,7 +6,7 @@ class Dev::LoginsController < ApplicationController
   before_action :refuse_outside_development
 
   def show
-    @users = User.order(:role, :id)
+    @users = User.active.order(:role, :id)
   end
 
   def create

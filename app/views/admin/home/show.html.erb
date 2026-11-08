@@ -15,13 +15,20 @@
     <tbody>
       <% @staff.each do |user| %>
         <tr class="border-t border-gray-200">
-          <td class="py-2"><%= user.email %></td>
+          <td class="py-2">
+            <%= user.email %>
+            <% if user.deactivated? %><span class="ml-2 text-sm text-gray-600"><%= t(".deactivated") %></span><% end %>
+          </td>
           <td class="py-2"><%= t("roles.#{user.role}") %></td>
           <td class="py-2"><%= user.passkeys.size %></td>
           <td class="py-2">
-            <% unless user == Current.user %>
-              <%= button_to t(".reset"), admin_user_passkey_reset_path(user),
-                form: { data: { turbo: false, controller: "confirm", action: "confirm#ask", confirm_message_value: t(".reset_confirm") } }, class: "underline cursor-pointer" %>
+            <% unless user == Current.user || user.deactivated? %>
+              <div class="flex gap-4">
+                <%= button_to t(".reset"), admin_user_passkey_reset_path(user),
+                  form: { data: { turbo: false, controller: "confirm", action: "confirm#ask", confirm_message_value: t(".reset_confirm") } }, class: "underline cursor-pointer" %>
+                <%= button_to t(".deactivate"), admin_user_deactivation_path(user),
+                  form: { data: { turbo: false, controller: "confirm", action: "confirm#ask", confirm_message_value: t(".deactivate_confirm") } }, class: "underline cursor-pointer" %>
+              </div>
             <% end %>
           </td>
         </tr>

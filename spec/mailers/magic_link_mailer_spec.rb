@@ -19,6 +19,15 @@ RSpec.describe MagicLinkMailer, type: :mailer do
     end
   end
 
+  it "sends nothing to a deactivated account" do
+    admins = %w[a1 a2].map { |name| User.create!(email: "#{name}@example.com", role: "admin") }
+    staff = User.create!(email: "analyste@example.com", role: "analyst")
+    queued = MagicLinkMailer.with(user: staff).sign_in
+    staff.deactivate!(by: admins.first)
+
+    expect { queued.deliver_now }.not_to change(ActionMailer::Base.deliveries, :size)
+  end
+
   describe MagicLinkLogObserver do
     let(:io) { StringIO.new }
 
