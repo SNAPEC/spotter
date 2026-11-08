@@ -75,6 +75,17 @@ class User < ApplicationRecord
     consumed
   end
 
+  # Lock order: the user, then the new session. A purge holding the lock first wins, and the sign-in
+  # finds no account instead of failing on the foreign key.
+  def start_session!
+    transaction do
+      lock!
+      sessions.create!
+    end
+  rescue ActiveRecord::RecordNotFound
+    nil
+  end
+
   # Lock order, on every path: admin rows (id order), then the user, then its sessions. Taking the
   # user first here keeps a concurrent passkey enrolment, which does the same, from deadlocking.
   def sign_out_everywhere!

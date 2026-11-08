@@ -24,4 +24,12 @@ RSpec.describe User, "purge of unused accounts", type: :model do
   it "keeps every date at the end of a month, in the database too" do
     expect { user.update_columns(purge_on: Date.new(2027, 3, 15)) }.to raise_error(ActiveRecord::StatementInvalid, /purge_on_end_of_month/)
   end
+
+  it "starts no session for an account purged since it was loaded" do
+    stale = User.find(user.id)
+    user.purge_if_unused!
+
+    expect(stale.start_session!).to be_nil
+    expect(Session.where(user_id: user.id)).to be_empty
+  end
 end

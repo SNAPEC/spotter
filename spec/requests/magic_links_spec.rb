@@ -102,6 +102,19 @@ RSpec.describe "Magic link sign-in", type: :request do
     expect(response).to redirect_to(login_path)
   end
 
+  it "sends back to the sign-in page, not a 500, when the account was purged during the sign-in" do
+    token = user.magic_link_token
+    allow(User).to receive(:sign_in_with_magic_link).and_wrap_original do |original, *args|
+      original.call(*args).tap { |signed_in| User.where(id: signed_in.id).delete_all }
+    end
+
+    post magic_link_path(token)
+
+    expect(response).to redirect_to(login_path)
+    expect(flash[:alert]).to eq(I18n.t("magic_links.consume.invalid"))
+    expect(signed_in_user).to be_nil
+  end
+
   it "refuses a tampered token" do
     request_link("lea.martin@example.com")
 

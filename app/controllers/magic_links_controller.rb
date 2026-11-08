@@ -29,8 +29,7 @@ class MagicLinksController < ApplicationController
   end
 
   def consume
-    if user = User.sign_in_with_magic_link(params[:token])
-      start_new_session_for user
+    if (user = User.sign_in_with_magic_link(params[:token])) && start_new_session_for(user)
       redirect_to after_authentication_url
     else
       redirect_to login_path, alert: t(".invalid")
