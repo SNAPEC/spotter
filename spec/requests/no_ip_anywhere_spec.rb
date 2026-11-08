@@ -98,7 +98,7 @@ RSpec.describe "No IP address anywhere", type: :request do
     report.ask_clarification!(analyst, "Pouvez-vous préciser le type de corde ?")
     AccessLog.record!(user: analyst, report: report, action: "ask_clarification")
     perform_enqueued_jobs
-    report.answer_clarification!("Une corde à simple de 60 mètres, fictive.")
+    report.answer_clarification!("Une corde à simple de 60 mètres, fictive.", user: declarant)
     report.validate!(analyst)
     AccessLog.record!(user: analyst, report: report, action: "validate")
     anonymous.reject!(analyst)

@@ -126,13 +126,15 @@ RSpec.describe Report::Lifecycle, type: :model do
       end
     end
 
-    it "records who asked for a clarification, and nothing when a question is pending" do
+    it "records who asked each clarification, and nothing when the exchange is refused" do
       report = in_validation
       report.ask_clarification!(analyst, "Question fictive ?")
+      report.ask_clarification!(analyst, "Autre question fictive ?")
 
-      expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, "ask_clarification" ] ])
-      expect { report.ask_clarification!(analyst, "Autre question fictive ?") }.to raise_error(Report::InvalidTransition)
-      expect(AccessLog.where(report_id: report.id).count).to eq(1)
+      expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, "ask_clarification" ] ] * 2)
+      report.validate!(analyst)
+      expect { report.ask_clarification!(analyst, "Question tardive ?") }.to raise_error(Report::InvalidTransition)
+      expect(AccessLog.where(report_id: report.id).count).to eq(3)
     end
   end
 
@@ -191,13 +193,15 @@ RSpec.describe Report::Lifecycle, type: :model do
     %i[validate! reject!].each do |decision|
       %w[confidential anonymous].each do |mode|
         it "leaves no raw text, no ownership and no digest after #{decision} (#{mode})" do
-          report = in_validation(mode: mode)
+          report = draft(mode: mode)
+          code = report.submit!
+          Report::Analyzer.new.call(report)
           report.update_column(:draft_token_digest, "leftover")
           narrative_id = report.narrative.id
           report.analyses.sole.update!(modifications: { "anonymized_text" => "Récit fictif retouché." })
           expect(report.analyses.sole.proposals.to_s).to include("Récit fictif.")
           report.ask_clarification!(analyst, "Question fictive ?")
-          report.answer_clarification!("Réponse fictive.")
+          report.answer_clarification!("Réponse fictive.", **(code ? { tracking_code: code } : { user: user }))
 
           report.public_send(decision, analyst)
 

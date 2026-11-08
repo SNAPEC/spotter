@@ -98,23 +98,25 @@ class Report < ApplicationRecord
     draft? && draft_expires_on < Date.current
   end
 
-  # The declarant is told by mail, after the commit, when the report still has a live ownership.
+  # The declarant is told by mail, after the commit, when the report starts waiting for them and
+  # still has a live ownership: a second question in a row sends nothing.
   def ask_clarification!(analyst, body)
     raise Report::NotAllowed, "only staff ask for clarification" unless analyst&.staff?
 
     with_lock do
-      raise Report::InvalidTransition, "a question is already pending" if awaiting_clarification?
-
+      was_awaiting = awaiting_clarification?
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
-        ActiveRecord.after_all_transactions_commit { ClarificationMailer.requested(self).deliver_later }
+        ActiveRecord.after_all_transactions_commit { ClarificationMailer.requested(self).deliver_later } unless was_awaiting
       end
     end
   end
 
-  def answer_clarification!(body)
+  # Authorisation comes before any state check, so a stranger learns nothing about the thread.
+  def answer_clarification!(body, user: nil, tracking_code: nil)
     with_lock do
-      raise Report::InvalidTransition, "no pending question" unless awaiting_clarification?
+      raise Report::NotAllowed, "not the declarant of this report" unless declarant?(user: user, tracking_code: tracking_code)
+      raise Report::InvalidTransition, "the analyst opens the exchange" unless clarifications.exists?(author: "analyst")
 
       add_clarification!("declarant", body)
     end
@@ -130,6 +132,16 @@ class Report < ApplicationRecord
   end
 
   private
+    def declarant?(user:, tracking_code:)
+      if confidential?
+        user.present? && tracking_code.nil? && ReportOwnership.live.of(user).exists?(report_id: id)
+      else
+        normalized = RecoveryCode.normalize(tracking_code)
+        user.nil? && normalized.present? && tracking_code_digest.present? &&
+          ActiveSupport::SecurityUtils.secure_compare(Report.digest(normalized, purpose: :tracking_code), tracking_code_digest)
+      end
+    end
+
     # Called under the row lock, which also makes the position sequential.
     def add_clarification!(author, body)
       raise Report::InvalidTransition, "cannot exchange on a #{status} report" unless under_analysis?
