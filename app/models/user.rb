@@ -75,8 +75,11 @@ class User < ApplicationRecord
     consumed
   end
 
+  # Lock order, on every path: admin rows (id order), then the user, then its sessions. Taking the
+  # user first here keeps a concurrent passkey enrolment, which does the same, from deadlocking.
   def sign_out_everywhere!
     transaction do
+      lock!
       sessions.destroy_all
       increment!(:login_token_version)
     end
@@ -215,8 +218,8 @@ class User < ApplicationRecord
       by.reload.then { |actor| actor.admin? && actor.active? }
     end
 
-    # Serialises with Session#register_passkey!, which locks the same row. Taken after the admin rows
-    # (acting_admin?), never before, so two admins acting on each other cannot deadlock.
+    # Serialises with Session#register_passkey!, which locks the same row. Lock order: after the admin
+    # rows (acting_admin?), before any session, so two admins acting on each other cannot deadlock.
     def lock_for_passkey_change!
       lock!
     end

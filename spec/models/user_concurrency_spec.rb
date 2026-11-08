@@ -38,4 +38,33 @@ RSpec.describe User, "under concurrency", type: :model do
 
     expect(outcomes.count(true)).to eq(1)
   end
+
+  it "signs out everywhere taking the user lock before touching any session" do
+    user = User.create!(email: "analyste@example.com", role: "analyst")
+    session = user.sessions.create!
+    locked = Concurrent::CountDownLatch.new(1)
+    release = Concurrent::CountDownLatch.new(1)
+
+    holder = Thread.new do
+      ActiveRecord::Base.connection_pool.with_connection do
+        User.transaction do
+          User.lock.find(user.id)
+          locked.count_down
+          release.wait
+        end
+      end
+    end
+    locked.wait
+    signing_out = Thread.new { ActiveRecord::Base.connection_pool.with_connection { User.find(user.id).sign_out_everywhere! } }
+    sleep 0.3
+
+    begin
+      expect(signing_out).to be_alive
+      expect { Session.transaction { Session.lock("FOR UPDATE NOWAIT").find(session.id) } }.not_to raise_error
+    ensure
+      release.count_down
+      [ holder, signing_out ].each(&:join)
+    end
+    expect(Session.exists?(session.id)).to be(false)
+  end
 end
