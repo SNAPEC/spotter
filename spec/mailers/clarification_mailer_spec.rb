@@ -78,7 +78,7 @@ RSpec.describe ClarificationMailer, type: :mailer do
     end
 
     written = File.binread(log, nil, offset).force_encoding(Encoding::UTF_8)
-    expect(written).to include("ClarificationMailer")
+    expect(written).to include("ClarificationMailDeliveryJob")
     expect(written).not_to include("lea.martin")
   end
 

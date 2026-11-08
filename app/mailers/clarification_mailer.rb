@@ -1,6 +1,8 @@
 class ClarificationMailer < ApplicationMailer
   class DeliveryFailed < StandardError; end
 
+  self.delivery_job = ClarificationMailDeliveryJob
+
   # A delivery error usually quotes the recipient: re-raised as is, it would land in the failed jobs table
   # and in Sentry next to the report's GlobalID. It is replaced by a bare error, without its cause.
   rescue_from "Net::SMTPError", "OpenSSL::SSL::SSLError", IOError, SocketError, SystemCallError, Timeout::Error do
