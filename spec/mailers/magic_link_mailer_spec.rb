@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe MagicLinkMailer, type: :mailer do
+  include ActiveJob::TestHelper
+
   let(:user) { User.create!(email: "lea.martin@example.com") }
   let(:mail) { MagicLinkMailer.with(user: user).sign_in }
 
@@ -26,6 +28,51 @@ RSpec.describe MagicLinkMailer, type: :mailer do
     staff.deactivate!(by: admins.first)
 
     expect { queued.deliver_now }.not_to change(ActionMailer::Base.deliveries, :size)
+  end
+
+  it "delivers through the queue and keeps the address and the user out of the test log" do
+    log = Rails.root.join("log/test.log")
+    offset = File.size?(log).to_i
+
+    User.send_magic_link(user.email)
+    expect { perform_enqueued_jobs }.to change { ActionMailer::Base.deliveries.size }.by(1)
+
+    written = File.binread(log, nil, offset).force_encoding(Encoding::UTF_8)
+    expect(written).to include("ApplicationMailDeliveryJob")
+    expect(written).not_to include("lea.martin", user.to_global_id.to_s)
+  end
+
+  describe "delivery failure" do
+    failing_smtp = Class.new do
+      def initialize(_settings); end
+
+      def deliver!(mail)
+        raise Net::SMTPFatalError.new(Net::SMTP::Response.parse("550 5.1.1 <#{mail.to.first}>: unknown recipient"))
+      end
+    end
+
+    around do |example|
+      ActionMailer::Base.add_delivery_method(:failing_smtp, failing_smtp)
+      described_class.delivery_method = :failing_smtp
+      example.run
+    ensure
+      described_class.delivery_method = ActionMailer::Base.delivery_method
+    end
+
+    it "raises an error that names neither the address nor the user" do
+      expect { mail.deliver_now }.to raise_error(ApplicationMailer::DeliveryFailed) { |error|
+        expect(error.cause).to be_nil
+        expect(error.full_message(highlight: false)).not_to include("lea.martin", "unknown recipient")
+      }
+    end
+
+    it "retries three times, then gives up without failing, so no failed job keeps the user's GlobalID" do
+      User.send_magic_link(user.email)
+
+      expect { 3.times { perform_enqueued_jobs } }.not_to raise_error
+      expect(enqueued_jobs).to be_empty
+      expect(performed_jobs.count { |job| job["job_class"] == "ApplicationMailDeliveryJob" }).to eq(3)
+    end
   end
 
   describe MagicLinkLogObserver do
