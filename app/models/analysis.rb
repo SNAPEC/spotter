@@ -1,4 +1,4 @@
-# The extractor's coded proposals for a report, then the analyst's changes and decisions on them.
+# The extractor's coded proposals for a report, then the analyst's changes to them.
 class Analysis < ApplicationRecord
   include ReadOnlyOnceDecided
 
