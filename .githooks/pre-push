@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Replays locally the CI checks that the pushed commits can break, fastest first.
+# Bypass only with a reason: PREPUSH_SKIP_REASON="..." git push (logged in .git/prepush-skips.log).
+# Full test suite: PREPUSH_FULL=1 git push.
+set -uo pipefail
+
+root=$(git rev-parse --show-toplevel)
+cd "$root" || exit 1
+
+if [ -n "${PREPUSH_SKIP_REASON:-}" ]; then
+  echo "$(date -Iseconds) $(git rev-parse --abbrev-ref HEAD) $PREPUSH_SKIP_REASON" >> "$(git rev-parse --git-dir)/prepush-skips.log"
+  echo "pre-push: skipped ($PREPUSH_SKIP_REASON). Write it in the handover today." >&2
+  exit 0
+fi
+
+zero=0000000000000000000000000000000000000000
+ranges=()
+
+# Git feeds the pushed refs on stdin. Read it only in hook mode, with a timeout:
+# run by hand from a tool, stdin may never close.
+if [ "${1:-}" != "" ] && [ ! -t 0 ]; then
+  while read -r -t 5 _local_ref local_sha _remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue
+    if [ "$remote_sha" = "$zero" ]; then
+      ranges+=("$local_sha --not --remotes")
+    else
+      ranges+=("$remote_sha..$local_sha")
+    fi
+  done
+fi
+if [ ${#ranges[@]} -eq 0 ]; then
+  ranges+=("$(git rev-parse --abbrev-ref '@{push}' 2>/dev/null || echo origin/main)..HEAD")
+fi
+
+changed=""
+for r in "${ranges[@]}"; do
+  # shellcheck disable=SC2086
+  changed+=$(git log --name-only --format= $r 2>/dev/null)$'\n'
+done
+changed=$(sort -u <<<"$changed" | sed '/^$/d')
+
+failed=0
+run() {
+  local name=$1; shift
+  local start=$SECONDS
+  if "$@" > /tmp/spotter-prepush.$$ 2>&1; then
+    printf '  ok    %-14s %3ss\n' "$name" $((SECONDS - start))
+  else
+    printf '  FAIL  %-14s %3ss\n' "$name" $((SECONDS - start))
+    sed 's/^/        /' /tmp/spotter-prepush.$$ | tail -40
+    failed=1
+  fi
+  rm -f /tmp/spotter-prepush.$$
+}
+missing() { printf '  skip  %-14s not installed (%s)\n' "$1" "$2"; }
+touched() { grep -Eq "$1" <<<"$changed"; }
+
+echo "pre-push: $(wc -l <<<"$changed" | tr -d ' ') file(s) changed"
+
+# 1. Clean tree: what is tested must be what is pushed.
+dirty=$(git status --porcelain --untracked-files=all | grep -E '^( M|M |MM|A |\?\? )' | grep -Ev '^\?\? (tmp|log|storage|coverage)/' || true)
+if [ -n "$dirty" ]; then
+  echo "  FAIL  clean-tree     uncommitted or untracked files:"
+  while IFS= read -r f; do echo "        $f"; done <<<"$dirty"
+  failed=1
+fi
+
+# 2. Secrets in the pushed commits.
+if command -v gitleaks >/dev/null; then
+  for r in "${ranges[@]}"; do
+    run gitleaks gitleaks git --no-banner --redact --log-opts="$r" .
+  done
+else
+  missing gitleaks "CI runs it anyway"
+fi
+
+# 3. Shell scripts.
+if touched '\.sh$|^\.githooks/'; then
+  if command -v shellcheck >/dev/null; then
+    run shellcheck shellcheck .githooks/* scripts/**/*.sh
+  else
+    missing shellcheck "CI runs it anyway"
+  fi
+fi
+
+# 4. Rails checks, once the app exists.
+if [ -x bin/rubocop ] && touched '\.(rb|rake)$|Gemfile'; then
+  run rubocop bin/rubocop
+fi
+if [ -x bin/brakeman ] && touched '^(app|config|lib)/|Gemfile'; then
+  run brakeman bin/brakeman --no-pager -q
+fi
+if [ -x bin/bundler-audit ] && touched '^Gemfile\.lock$'; then
+  run bundler-audit bin/bundler-audit
+fi
+if [ "${PREPUSH_FULL:-}" = "1" ] && [ -x bin/rspec ]; then
+  run rspec bin/rspec
+fi
+
+if [ $failed -ne 0 ]; then
+  echo "pre-push: blocked. Fix the failures, or push with PREPUSH_SKIP_REASON=\"...\"." >&2
+  exit 1
+fi
