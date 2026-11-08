@@ -26,6 +26,13 @@
   <body>
     <% if authenticated? %>
       <nav class="container mx-auto px-5 py-3 flex justify-end gap-3">
+        <%= link_to t("navigation.declarant"), root_path, class: "underline" %>
+        <% if Current.user.staff? %>
+          <%= link_to t("navigation.analyst"), analyst_root_path, class: "underline" %>
+        <% end %>
+        <% if Current.user.admin? %>
+          <%= link_to t("navigation.admin"), admin_root_path, class: "underline" %>
+        <% end %>
         <%= button_to t("sessions.destroy.submit"), session_path, method: :delete, class: "underline cursor-pointer" %>
         <%= button_to t("sessions.destroy_all.submit"), sessions_path, method: :delete, class: "underline cursor-pointer" %>
       </nav>

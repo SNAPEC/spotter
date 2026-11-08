@@ -28,3 +28,23 @@ fr:
       submit: "Se connecter"
     consume:
       invalid: "Ce lien n’est plus valable. Demandez-en un nouveau."
+  errors:
+    forbidden:
+      title: "Accès refusé"
+      body: "Vous n’avez pas les droits nécessaires pour consulter cette page."
+  navigation:
+    declarant: "Mes signalements"
+    analyst: "Analyse"
+    admin: "Administration"
+  declarant:
+    home:
+      show:
+        title: "Mes signalements"
+  analyst:
+    home:
+      show:
+        title: "Analyse"
+  admin:
+    home:
+      show:
+        title: "Administration"

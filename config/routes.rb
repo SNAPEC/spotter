@@ -8,8 +8,9 @@ Rails.application.routes.draw do
   resource :session, only: :destroy
   delete "sessions" => "sessions#destroy_all", as: :sessions
 
-  # Placeholder until the declarant home lands (task 4).
-  root "magic_links#new"
+  root "declarant/home#show"
+  get "analyst" => "analyst/home#show", as: :analyst_root
+  get "admin" => "admin/home#show", as: :admin_root
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
