@@ -87,7 +87,7 @@ RSpec.describe Clarification, type: :model do
       end
 
       expect(enqueued_jobs.size).to eq(1)
-      expect(enqueued_jobs.sole["job_class"]).to eq("ActionMailer::MailDeliveryJob")
+      expect(enqueued_jobs.sole["job_class"]).to eq("ClarificationMailDeliveryJob")
       expect(enqueued_jobs.sole["arguments"].to_s).not_to include("Question", "lea.martin")
       expect(enqueued_jobs.sole["arguments"].last).to eq("args" => [ { "_aj_globalid" => report.to_global_id.to_s } ], "_aj_ruby2_keywords" => [ "args" ])
     end
