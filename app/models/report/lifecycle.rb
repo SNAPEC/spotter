@@ -102,17 +102,27 @@ module Report::Lifecycle
     transition!(from: "submitted", to: "analyzing")
   end
 
-  def ready_for_validation!
-    transition!(from: "analyzing", to: "in_validation")
+  # The block runs under the row lock, before the new status is saved with it.
+  def ready_for_validation!(&)
+    transition!(from: "analyzing", to: "in_validation", &)
   end
 
   # Shadows ActiveModel's validate!: use valid? or save! to run the model validations.
+  # The anonymised text is the only text kept: it is required, unless the narrative was purged at 180
+  # days and the analyst could only code from the answers.
   def validate!(analyst)
-    decide!(analyst, from: %w[in_validation], to: "validated", action: "validate")
+    decide!(analyst, from: %w[in_validation], to: "validated", action: "validate") do
+      next if raw_content_purged? || anonymized_text.present?
+
+      errors.clear
+      errors.add(:anonymized_text, :blank)
+      raise ActiveRecord::RecordInvalid, self
+    end
   end
 
+  # A rejected report keeps no text at all, the analyst's included.
   def reject!(analyst)
-    decide!(analyst, from: UNDER_ANALYSIS_STATUSES, to: "rejected", action: "reject")
+    decide!(analyst, from: UNDER_ANALYSIS_STATUSES, to: "rejected", action: "reject") { self.anonymized_text = nil }
   end
 
   class_methods do
@@ -224,6 +234,7 @@ module Report::Lifecycle
       raise Report::NotAllowed, "only active staff decide on a report" unless analyst&.active_staff?
 
       transition!(from: from, to: to) do
+        yield
         AccessLog.record!(user: analyst, report: self, action: action)
         close_editing
         purge_raw_content

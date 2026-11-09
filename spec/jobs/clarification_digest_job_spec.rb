@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 require Rails.root.join("spec/support/submittable")
 require "fugit"
 
@@ -139,7 +140,7 @@ RSpec.describe ClarificationDigestJob, type: :job do
   it "sends nothing for a decided report, which keeps no trace of a notice" do
     report = asked(lea)
     digest_recipients
-    report.validate!(analyst)
+    validate_with_text!(report, analyst)
 
     expect(digest_recipients).to be_empty
     expect(report.reload).not_to be_declarant_notified

@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Report, "#edit_submitted!", type: :model do
@@ -217,7 +218,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
       "take_charge!" => [ ->(report, analyst) { report.take_charge!(analyst) }, Report::InvalidTransition ],
       "ask_clarification!" => [ ->(report, analyst) { report.ask_clarification!(analyst, "Question fictive ?") }, Report::InvalidTransition ],
       # The decision cuts the authorship link: the declarant is no longer recognised at all.
-      "validate!" => [ ->(report, analyst) { Report::Analyzer.new.call(report, revision: report.content_revision) && report.validate!(analyst) }, Report::NotAllowed ],
+      "validate!" => [ ->(report, analyst) { Report::Analyzer.new.call(report, revision: report.content_revision) && Decidable.validate_with_text!(report, analyst) }, Report::NotAllowed ],
       "reject!" => [ ->(report, analyst) { report.reject!(analyst) }, Report::NotAllowed ]
     }.each do |action, (act, error)|
       it "is refused after #{action}" do

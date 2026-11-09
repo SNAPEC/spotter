@@ -36,7 +36,7 @@ class Report::Analyzer
       analysis = report.analyses.create!(
         provider: @extractor.provider, model: @extractor.model, prompt_version: @extractor.prompt_version, proposals: proposals
       )
-      report.ready_for_validation!
+      report.ready_for_validation! { report.prefill_blanks_from(analysis) }
       analysis
     end
   rescue Llm::UnconfiguredExtractor::NotConfigured

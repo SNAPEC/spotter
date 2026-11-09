@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 
 RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
   include ActiveJob::TestHelper
@@ -31,7 +32,6 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     report, = submitted
     travel_to(submission_day) do
       Report::Analyzer.new.call(report, revision: report.content_revision)
-      report.analyses.sole.update!(modifications: { "weather" => "Retouche fictive." })
       report.ask_clarification!(analyst, "Question fictive ?")
     end
     report.reload
@@ -64,13 +64,14 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     expect(narrative.free_text_answers).to eq({})
     expect(Clarification.where(report_id: report.id)).to be_empty
     analysis = Analysis.where(report_id: report.id).sole
-    expect(analysis.modifications).to eq({})
     expect(analysis.proposals.to_s).not_to include("excerpt", "Récit fictif")
     expect(ReportOwnership.where(report_id: report.id)).to be_empty
     expect(report.reload).to have_attributes(
       status: "in_validation", tracking_code_digest: nil, draft_token_digest: nil, editable_until: nil,
-      declarant_notified: false, answers: { "weather" => "good" }
+      declarant_notified: false
     )
+    # The question took the report over: the blanks were pre-filled, the declarant's answer stays.
+    expect(report.answers).to include("weather" => "good")
     expect(report.casualties.sole).to have_attributes(severity: "minor", answers: { "age_range" => "over_60" })
     expect(AccessLog.where(report_id: report.id).pluck(:action)).to eq([ "ask_clarification" ])
   end
@@ -88,7 +89,7 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     report = in_validation
     purge_on(due_day)
 
-    travel_to(due_day) { report.validate!(analyst) }
+    travel_to(due_day) { validate_with_text!(report, analyst) }
 
     expect(report.reload).to be_validated
   end

@@ -189,21 +189,21 @@ RSpec.describe Report::Analyzer, type: :model do
 
       stored = Analysis.find(analysis.id).proposals
       expect(stored["weather"]).to eq("value" => "good")
-      expect(stored["odd"]).to eq({})
+      expect(stored).not_to have_key("odd")
       expect(Analysis.where(id: analysis.id).pick(Arel.sql("proposals::text"))).not_to include("Chute fictive", "quote", "excerpt")
     end
 
 
-    it "leaves no excerpt and no modification, and keeps the coded values" do
+    it "leaves no excerpt and no text the extractor would add, and keeps the coded values" do
       analysis = analyze
-      analysis.update!(modifications: { "anonymized_text" => raw_text })
-      values = analysis.proposals.transform_values { |proposal| proposal["value"] }
+      analysis.update!(proposals: analysis.proposals.merge("anonymized_text" => { "value" => raw_text, "excerpt" => raw_text }))
+      values = analysis.proposals.except("anonymized_text").transform_values { |proposal| proposal["value"] }
 
       analysis.strip_raw_excerpts!
 
       stored = Analysis.find(analysis.id)
-      expect(stored.modifications).to eq({})
-      expect(stored.proposals.transform_values { |proposal| proposal["value"] }).to eq(values)
+      expect(stored.proposals).not_to have_key("anonymized_text")
+      expect(stored.proposals.except("anonymized_text").transform_values { |proposal| proposal["value"] }).to eq(values)
       expect(stored.proposals.values).to all(satisfy { |proposal| !proposal.key?("excerpt") })
       expect(Analysis.where(id: analysis.id).pick(Arel.sql("proposals::text"))).not_to include("Chute fictive")
     end

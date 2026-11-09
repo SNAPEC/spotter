@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 require Rails.root.join("spec/support/submittable")
 
 # Outside a test transaction: inside one, every row would share the test's transaction id.
@@ -32,7 +33,7 @@ RSpec.describe Report, "rows kept after the decision", type: :model do
       Report::Analyzer.new.call(report, revision: report.content_revision)
       expect(xmins("casualties", report).uniq).not_to eq(xmins("reports", report))
 
-      report.public_send(decision, analyst)
+      decide_with_text!(report, decision, analyst)
 
       decision_xmin = xmins("reports", report)
       expect(decision_xmin.size).to eq(1)

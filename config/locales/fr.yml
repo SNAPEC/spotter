@@ -213,6 +213,7 @@ fr:
         answers: "Les réponses"
         narrative: "Le récit"
         casualties: "Les personnes blessées"
+        anonymized_text: "Le récit anonymisé"
       narrative:
         raw_text: "Le récit"
         debrief_causes: "Ce qui a mené à l’événement"
