@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 
 RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
   include ActiveJob::TestHelper
@@ -31,7 +32,6 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     report, = submitted
     travel_to(submission_day) do
       Report::Analyzer.new.call(report, revision: report.content_revision)
-      report.analyses.sole.update!(modifications: { "weather" => "Retouche fictive." })
       report.ask_clarification!(analyst, "Question fictive ?")
     end
     report.reload
@@ -64,7 +64,6 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     expect(narrative.free_text_answers).to eq({})
     expect(Clarification.where(report_id: report.id)).to be_empty
     analysis = Analysis.where(report_id: report.id).sole
-    expect(analysis.modifications).to eq({})
     expect(analysis.proposals.to_s).not_to include("excerpt", "Récit fictif")
     expect(ReportOwnership.where(report_id: report.id)).to be_empty
     expect(report.reload).to have_attributes(
@@ -88,7 +87,7 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     report = in_validation
     purge_on(due_day)
 
-    travel_to(due_day) { report.validate!(analyst) }
+    travel_to(due_day) { validate_with_text!(report, analyst) }
 
     expect(report.reload).to be_validated
   end

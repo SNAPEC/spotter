@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Report, "taking in charge", type: :model do
@@ -87,7 +88,7 @@ RSpec.describe Report, "taking in charge", type: :model do
       it "take the report in charge with #{decision}, and keep it so after the purge" do
         Report::Analyzer.new.call(report, revision: report.content_revision) if status == "in_validation"
         expect(report.reload.editable_until).to be_present
-        report.public_send(decision, analyst)
+        decide_with_text!(report, decision, analyst)
 
         expect(report.reload).to be_taken_in_charge
         expect(report.editable_until).to be_nil

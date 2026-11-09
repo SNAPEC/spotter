@@ -90,7 +90,10 @@ begin
     spec[:failed_analysis] ? analyzer.record_failure(report, revision: report.content_revision) : analyzer.call(report, revision: report.content_revision)
     report.ask_clarification!(analyst, spec[:clarification]) if spec[:clarification]
     case spec[:status]
-    when "validated" then report.validate!(analyst)
+    when "validated"
+      report.take_charge!(analyst)
+      report.write_anonymized_text!(analyst, "Récit anonymisé fictif : un incident sans gravité dans un lieu fictif.")
+      report.validate!(analyst)
     when "rejected" then report.reject!(analyst)
     end
   end

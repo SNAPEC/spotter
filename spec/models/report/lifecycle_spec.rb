@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 
 RSpec.describe Report::Lifecycle, type: :model do
   include ActiveSupport::Testing::TimeHelpers
@@ -71,7 +72,7 @@ RSpec.describe Report::Lifecycle, type: :model do
       report.submit!
       report.start_analysis!
       report.ready_for_validation!
-      report.validate!(analyst)
+      validate_with_text!(report, analyst)
 
       expect(report.reload).to be_validated
     end
@@ -118,11 +119,11 @@ RSpec.describe Report::Lifecycle, type: :model do
     { validate!: "validate", reject!: "reject" }.each do |decision, action|
       it "records who decided with #{decision}, and nothing when the transition fails" do
         report = in_validation
-        report.public_send(decision, analyst)
+        decide_with_text!(report, decision, analyst)
 
-        expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, action ] ])
-        expect { report.public_send(decision, analyst) }.to raise_error(Report::InvalidTransition)
-        expect(AccessLog.where(report_id: report.id).count).to eq(1)
+        expect(AccessLog.where(report_id: report.id, action: action).pluck(:user_id)).to eq([ analyst.id ])
+        expect { decide_with_text!(report, decision, analyst) }.to raise_error(Report::InvalidTransition)
+        expect(AccessLog.where(report_id: report.id, action: action).count).to eq(1)
       end
     end
 
@@ -132,9 +133,9 @@ RSpec.describe Report::Lifecycle, type: :model do
       report.ask_clarification!(analyst, "Autre question fictive ?")
 
       expect(AccessLog.where(report_id: report.id).pluck(:user_id, :action)).to eq([ [ analyst.id, "ask_clarification" ] ] * 2)
-      report.validate!(analyst)
+      validate_with_text!(report, analyst)
       expect { report.ask_clarification!(analyst, "Question tardive ?") }.to raise_error(Report::InvalidTransition)
-      expect(AccessLog.where(report_id: report.id).count).to eq(3)
+      expect(AccessLog.where(report_id: report.id, action: %w[ask_clarification validate]).count).to eq(3)
     end
   end
 
@@ -142,7 +143,7 @@ RSpec.describe Report::Lifecycle, type: :model do
     %i[validate! reject!].each do |decision|
       it "refuses raw text, debriefing answers and casualty changes after #{decision}" do
         report = in_validation
-        report.public_send(decision, analyst)
+        decide_with_text!(report, decision, analyst)
         narrative = Narrative.find_by(report_id: report.id)
         casualty = report.casualties.sole
 
@@ -159,21 +160,22 @@ RSpec.describe Report::Lifecycle, type: :model do
     end
 
     %i[validate! reject!].each do |decision|
-      it "refuses excerpts and modifications written back to the analysis after #{decision}" do
+      it "refuses excerpts written back to the analysis after #{decision}" do
         report = in_validation
-        report.public_send(decision, analyst)
+        decide_with_text!(report, decision, analyst)
         analysis = Analysis.find(report.analyses.sole.id)
         kept = analysis.proposals
 
-        expect { analysis.update!(modifications: { "anonymized_text" => "Récit fictif réinjecté" }) }.to raise_error(ActiveRecord::RecordInvalid)
-        analysis.reload
         expect { analysis.update!(proposals: kept.merge("cause" => { "value" => "other", "excerpt" => "Récit fictif" })) }
           .to raise_error(ActiveRecord::RecordInvalid)
         analysis.reload
         expect { analysis.update!(proposals: kept.merge("odd" => "Récit fictif")) }.to raise_error(ActiveRecord::RecordInvalid)
         analysis.reload
-        expect { analysis.update!(status: "reviewed", proposals: kept.merge("cause" => { "value" => "other" })) }.not_to raise_error
-        expect(Analysis.find(analysis.id).modifications).to be_empty
+        analysis.reload
+        expect { analysis.update!(proposals: kept.merge("anonymized_text" => { "value" => "Récit fictif réinjecté" })) }
+          .to raise_error(ActiveRecord::RecordInvalid)
+        analysis.reload
+        expect { analysis.update!(proposals: kept.merge("cause" => { "value" => "other" })) }.not_to raise_error
         expect(Analysis.find(analysis.id).proposals.to_s).not_to include("Récit fictif")
       end
     end
@@ -198,12 +200,11 @@ RSpec.describe Report::Lifecycle, type: :model do
           Report::Analyzer.new.call(report, revision: report.content_revision)
           report.update_column(:draft_token_digest, "leftover")
           narrative_id = report.narrative.id
-          report.analyses.sole.update!(modifications: { "anonymized_text" => "Récit fictif retouché." })
           expect(report.analyses.sole.proposals.to_s).to include("Récit fictif.")
           report.ask_clarification!(analyst, "Question fictive ?")
           report.answer_clarification!("Réponse fictive.", **(code ? { tracking_code: code } : { user: user }))
 
-          report.public_send(decision, analyst)
+          decide_with_text!(report, decision, analyst)
 
           narrative = Narrative.find(narrative_id)
           expect(narrative.raw_text).to be_nil
@@ -218,7 +219,6 @@ RSpec.describe Report::Lifecycle, type: :model do
           expect(report.casualties.sole.reload.answers).to eq("age_range" => "over_60")
           expect(report.casualties.sole.severity).to eq("minor")
           expect(Clarification.where(report_id: report.id)).to be_empty
-          expect(Analysis.where(report_id: report.id).pluck(:modifications)).to eq([ {} ])
           expect(Analysis.where(report_id: report.id).sole.proposals.to_s).not_to include("excerpt", "Récit fictif")
           expect(Analysis.where(report_id: report.id).sole.proposals).to include("weather" => { "value" => be_present })
         end
@@ -231,17 +231,14 @@ RSpec.describe Report::Lifecycle, type: :model do
       Narrative.connection.select_value("SELECT #{column} FROM #{table} WHERE id = '#{id}'")
     end
 
-    it "stores free-text answers, excerpts and modifications as ciphertext" do
+    it "stores free-text answers and excerpts as ciphertext" do
       report = in_validation
       analysis = report.analyses.sole
-      analysis.update!(modifications: { "anonymized_text" => "Récit retouché fictif." })
 
       expect(report.narrative.reload.free_text_answers).to eq("material_damage" => "Corde fictive coupée")
       expect(raw("narratives", "free_text_answers", report.narrative.id)).not_to include("Corde", "material_damage")
       expect(raw("analyses", "proposals", analysis.id)).not_to include("excerpt", "Récit fictif", "weather")
-      expect(raw("analyses", "modifications", analysis.id)).not_to include("anonymized_text", "retouché")
       expect(analysis.reload.proposals["weather"]).to include("excerpt")
-      expect(analysis.modifications).to eq("anonymized_text" => "Récit retouché fictif.")
     end
   end
 
@@ -250,7 +247,7 @@ RSpec.describe Report::Lifecycle, type: :model do
       report = in_validation
       report.narrative.update_column(:free_text_answers, nil)
 
-      expect { report.validate!(analyst) }.not_to raise_error
+      expect { validate_with_text!(report, analyst) }.not_to raise_error
       expect(report.reload).to be_validated
     end
   end
