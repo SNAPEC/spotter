@@ -154,11 +154,12 @@ RSpec.describe Report, "analyst coding", type: :model do
 
     it "runs under the row lock: a report decided meanwhile is refused, whatever the copy in memory says" do
       stale = Report.find(report.id)
+      before = stale.discipline
       report.reject!(analyst)
 
       expect(stale).to be_in_validation
       expect { stale.correct_coding!(analyst, discipline: "bouldering") }.to raise_error(Report::InvalidTransition)
-      expect(Report.find(report.id).discipline).to be_nil.or(be_a(String))
+      expect(Report.find(report.id).discipline).to eq(before)
       expect(coding_logs).to be_empty
     end
 
@@ -293,8 +294,8 @@ RSpec.describe Report, "analyst coding", type: :model do
         report.public_send(decision, analyst)
 
         stored = Analysis.find(analysis.id).proposals
-        expect(stored["anonymized_text"]).to eq({})
-        expect(Analysis.connection.select_value("SELECT proposals FROM analyses WHERE id = '#{analysis.id}'")).not_to include("Chute", "anonymized")
+        expect(stored).not_to have_key("anonymized_text")
+        expect(stored.to_s).not_to include(raw_text)
         expect(stored.except("anonymized_text").values).to all(satisfy { |proposal| proposal.keys == [ "value" ] })
       end
     end

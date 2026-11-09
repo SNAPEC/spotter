@@ -102,8 +102,9 @@ module Report::Lifecycle
     transition!(from: "submitted", to: "analyzing")
   end
 
-  def ready_for_validation!
-    transition!(from: "analyzing", to: "in_validation")
+  # The block runs under the row lock, before the new status is saved with it.
+  def ready_for_validation!(&)
+    transition!(from: "analyzing", to: "in_validation", &)
   end
 
   # Shadows ActiveModel's validate!: use valid? or save! to run the model validations.

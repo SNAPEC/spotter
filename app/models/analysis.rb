@@ -21,7 +21,7 @@ class Analysis < ApplicationRecord
   # extractor would add, say) is derived from the narrative and goes with it.
   def strip_raw_excerpts!
     codes = coded_field_codes
-    update!(proposals: proposals.to_h { |code, proposal| [ code, codes.include?(code) && proposal.is_a?(Hash) ? proposal.slice("value") : {} ] })
+    update!(proposals: proposals.to_h.filter_map { |code, proposal| [ code, proposal.slice("value") ] if codes.include?(code) && proposal.is_a?(Hash) }.to_h)
   end
 
   # What the extractor proposed against what the analyst validated, field by field, over the validated

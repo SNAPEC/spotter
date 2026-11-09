@@ -189,7 +189,7 @@ RSpec.describe Report::Analyzer, type: :model do
 
       stored = Analysis.find(analysis.id).proposals
       expect(stored["weather"]).to eq("value" => "good")
-      expect(stored["odd"]).to eq({})
+      expect(stored).not_to have_key("odd")
       expect(Analysis.where(id: analysis.id).pick(Arel.sql("proposals::text"))).not_to include("Chute fictive", "quote", "excerpt")
     end
 
@@ -202,7 +202,7 @@ RSpec.describe Report::Analyzer, type: :model do
       analysis.strip_raw_excerpts!
 
       stored = Analysis.find(analysis.id)
-      expect(stored.proposals["anonymized_text"]).to eq({})
+      expect(stored.proposals).not_to have_key("anonymized_text")
       expect(stored.proposals.except("anonymized_text").transform_values { |proposal| proposal["value"] }).to eq(values)
       expect(stored.proposals.values).to all(satisfy { |proposal| !proposal.key?("excerpt") })
       expect(Analysis.where(id: analysis.id).pick(Arel.sql("proposals::text"))).not_to include("Chute fictive")

@@ -148,7 +148,7 @@ class Report < ApplicationRecord
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
         self.declarant_notified = false unless was_awaiting
-        close_editing
+        take_over
         save!
       end
     end
@@ -164,24 +164,22 @@ class Report < ApplicationRecord
       next if taken_in_charge?
 
       AccessLog.record!(user: analyst, report: self, action: "take_charge")
-      close_editing
-      # The declarant can no longer edit: what is blank now stays the analyst's to fill.
-      prefill_blanks_from(analyses.where(status: "proposed").order(:prompt_version).last)
+      take_over
       save!
     end
   end
 
   # The report carries the final codes. A field the declarant left blank starts from the extractor's
   # proposal, and only from then on: before the take-over the declarant may still fill it, so their
-  # answers and the extractor's never mix. Called under the row lock by take_charge! and by the analyzer
-  # when its proposals arrive after the take-over. An unstated proposal (nil) fills nothing.
+  # answers and the extractor's never mix. Called under the row lock, at the take-over and by the analyzer
+  # when its proposals arrive after it; the caller saves. An unstated proposal (nil) fills nothing.
+  # The analyst codes only once the analysis is over, so a late proposal never overwrites a correction.
   def prefill_blanks_from(analysis)
     return unless taken_in_charge? && under_analysis? && analysis&.status == "proposed"
 
     proposed = analysis.proposals.to_h.filter_map { |code, proposal| [ code, proposal["value"] ] if proposal.is_a?(Hash) && !proposal["value"].nil? }.to_h
     assign_attributes(proposed.slice(*TAXONOMY_COLUMNS).select { |code, _| self[code].blank? })
     self.answers = answers.merge(proposed.except(*TAXONOMY_COLUMNS).select { |code, _| answers[code].blank? })
-    save!
   end
 
   # The analyst corrects the codes of a report they took in charge, whatever came from the declarant or
@@ -258,9 +256,19 @@ class Report < ApplicationRecord
 
   private
     # The block assigns; nothing is written, logged or saved when it changes nothing.
+    # Any staff action that closes editing goes through here: what is blank from then on starts from the
+    # extractor's proposal. A decision only closes editing, it never fills a field the analyst left blank.
+    def take_over
+      return if taken_in_charge?
+
+      close_editing
+      prefill_blanks_from(analyses.where(status: "proposed").order(:prompt_version).last)
+    end
+
     def write_as_analyst(analyst)
       with_lock do
-        raise Report::InvalidTransition, "cannot code a #{status} report" unless under_analysis?
+        # Before in_validation the extractor's proposals may still arrive and pre-fill the blanks.
+        raise Report::InvalidTransition, "cannot code a #{status} report" unless in_validation?
         raise Report::InvalidTransition, "take the report in charge first" unless taken_in_charge?
 
         yield

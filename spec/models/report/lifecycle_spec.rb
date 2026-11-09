@@ -215,7 +215,8 @@ RSpec.describe Report::Lifecycle, type: :model do
           expect(ReportOwnership.where(report_id: report.id)).to be_empty
           expect(Report.owned_by(user)).to be_empty
           expect(Report.where(id: report.id).pick(:tracking_code_digest, :draft_token_digest)).to eq([ nil, nil ])
-          expect(Report.find(report.id).answers).to eq("weather" => "good", "clients_count" => 4)
+          # The question took the report over and pre-filled the blanks: the declarant's answers stay.
+          expect(Report.find(report.id).answers).to include("weather" => "good", "clients_count" => 4)
           expect(report.casualties.sole.reload.answers).to eq("age_range" => "over_60")
           expect(report.casualties.sole.severity).to eq("minor")
           expect(Clarification.where(report_id: report.id)).to be_empty

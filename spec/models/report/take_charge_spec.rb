@@ -3,6 +3,8 @@ require Rails.root.join("spec/support/decidable")
 require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Report, "taking in charge", type: :model do
+  include ActiveSupport::Testing::TimeHelpers
+
   before { TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml")).publish! }
 
   let(:user) { User.create!(email: "lea.martin@example.com") }
@@ -84,15 +86,25 @@ RSpec.describe Report, "taking in charge", type: :model do
       expect(take_charge_logs).to be_empty
     end
 
-    { validate!: "in_validation", reject!: "submitted" }.each do |decision, status|
-      it "take the report in charge with #{decision}, and keep it so after the purge" do
-        Report::Analyzer.new.call(report, revision: report.content_revision) if status == "in_validation"
-        expect(report.reload.editable_until).to be_present
-        decide_with_text!(report, decision, analyst)
+    it "take the report in charge with reject!, and keep it so after the purge" do
+      expect(report.editable_until).to be_present
+      report.reject!(analyst)
 
-        expect(report.reload).to be_taken_in_charge
-        expect(report.editable_until).to be_nil
+      expect(report.reload).to be_taken_in_charge
+      expect(report.editable_until).to be_nil
+    end
+
+    # Without a take-over, only a report purged at 180 days can be validated: no text is required then.
+    it "take the report in charge with validate! once the raw content is purged at 180 days" do
+      Report::Analyzer.new.call(report, revision: report.content_revision)
+      travel_to(report.submitted_on + 181.days) do
+        Report.purge_overdue_raw_content
+        report.reload.validate!(analyst)
       end
+
+      expect(report.reload).to be_validated
+      expect(report).to be_taken_in_charge
+      expect(report.editable_until).to be_nil
     end
   end
 end

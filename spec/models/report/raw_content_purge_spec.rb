@@ -68,8 +68,10 @@ RSpec.describe Report, ".purge_overdue_raw_content", type: :model do
     expect(ReportOwnership.where(report_id: report.id)).to be_empty
     expect(report.reload).to have_attributes(
       status: "in_validation", tracking_code_digest: nil, draft_token_digest: nil, editable_until: nil,
-      declarant_notified: false, answers: { "weather" => "good" }
+      declarant_notified: false
     )
+    # The question took the report over: the blanks were pre-filled, the declarant's answer stays.
+    expect(report.answers).to include("weather" => "good")
     expect(report.casualties.sole).to have_attributes(severity: "minor", answers: { "age_range" => "over_60" })
     expect(AccessLog.where(report_id: report.id).pluck(:action)).to eq([ "ask_clarification" ])
   end
