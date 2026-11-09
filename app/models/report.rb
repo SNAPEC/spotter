@@ -7,6 +7,7 @@ class Report < ApplicationRecord
   DRAFT_NARRATIVE_ATTRIBUTES = [ "raw_text", "free_text_answers", *Narrative::DEBRIEF_FIELDS ].freeze
   DRAFT_CASUALTY_ATTRIBUTES = %w[id severity answers _destroy].freeze
   DRAFT_VALIDITY = 30
+  MAX_CASUALTIES = 3
 
   class InvalidTransition < StandardError; end
   class NotAllowed < StandardError; end
@@ -31,7 +32,9 @@ class Report < ApplicationRecord
   validates :mode, inclusion: { in: MODES }
   validates :status, inclusion: { in: STATUSES }
   validates :event_type, inclusion: { in: EVENT_TYPES }, allow_nil: true
+  before_validation :cast_answers, if: -> { taxonomy_version && will_save_change_to_answers? }
   validate :taxonomy_codes_are_options, :answers_fit_taxonomy, if: :taxonomy_version
+  validate :casualties_within_limit
 
   scope :expired_drafts, -> { where(status: "draft", draft_expires_on: ...Date.current) }
   # Anonymous reports have no one to write to: they are left alone.
@@ -109,6 +112,11 @@ class Report < ApplicationRecord
 
   def anonymous?
     mode == "anonymous"
+  end
+
+  # The state conditions of edit_submitted!, with no identity involved.
+  def editable_by_declarant?
+    under_analysis? && !taken_in_charge? && !raw_content_purged? && editable_until.present? && editable_until >= Date.current
   end
 
   def open_draft?
@@ -229,6 +237,17 @@ class Report < ApplicationRecord
 
         errors.add(column, :inclusion)
       end
+    end
+
+    def cast_answers
+      cast = taxonomy_version.cast_answers(answers, scope: :report)
+      self.answers = cast unless cast == answers
+    end
+
+    def casualties_within_limit
+      return if casualties.reject(&:marked_for_destruction?).size <= MAX_CASUALTIES
+
+      errors.add(:casualties, :too_many, count: MAX_CASUALTIES)
     end
 
     def answers_fit_taxonomy

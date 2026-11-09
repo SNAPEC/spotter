@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe CloseExpiredEditWindowsJob, type: :job do
   include ActiveSupport::Testing::TimeHelpers
@@ -7,7 +8,7 @@ RSpec.describe CloseExpiredEditWindowsJob, type: :job do
 
   def submitted_with_window(editable_until)
     Report.start_draft!(mode: "anonymous").first.tap do |report|
-      report.submit!
+      submittable(report).submit!
       report.update_column(:editable_until, editable_until)
     end
   end
@@ -27,7 +28,7 @@ RSpec.describe CloseExpiredEditWindowsJob, type: :job do
   it "closes a window the day its report's ownership is cut, like CutOwnershipsJob" do
     user = User.create!(email: "lea.martin@example.com")
     report, = travel_to(Date.new(2026, 11, 17)) { Report.start_draft!(mode: "confidential", user: user) }
-    travel_to(Date.new(2026, 11, 17)) { report.submit! }
+    travel_to(Date.new(2026, 11, 17)) { submittable(report).submit! }
 
     travel_to(Date.new(2027, 1, 15)) do
       described_class.perform_now

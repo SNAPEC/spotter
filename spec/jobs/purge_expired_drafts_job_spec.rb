@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe PurgeExpiredDraftsJob, type: :job do
   include ActiveSupport::Testing::TimeHelpers
@@ -35,7 +36,7 @@ RSpec.describe PurgeExpiredDraftsJob, type: :job do
 
   it "never touches a submitted report" do
     submitted = draft
-    submitted.submit!
+    submittable(submitted).submit!
     submitted.update_column(:draft_expires_on, Date.current - 90)
 
     described_class.perform_now

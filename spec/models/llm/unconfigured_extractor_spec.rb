@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Llm::UnconfiguredExtractor do
   include ActiveJob::TestHelper
@@ -20,7 +21,7 @@ RSpec.describe Llm::UnconfiguredExtractor do
   it "hands every report over to the analyst at once, with a failed analysis and no proposal" do
     report, = Report.start_draft!(mode: "anonymous")
     report.save_draft!(narrative_attributes: { raw_text: "Récit fictif d'un rappel trop court." })
-    report.submit!
+    submittable(report).submit!
 
     perform_enqueued_jobs
 

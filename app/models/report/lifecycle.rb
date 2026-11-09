@@ -27,7 +27,7 @@ module Report::Lifecycle
     with_lock do
       raise Report::InvalidTransition, "not an open draft" unless open_draft?
 
-      assign_attributes(attrs)
+      assign_attributes(merge_answers(attrs))
       self.draft_expires_on = Date.current + Report::DRAFT_VALIDITY
       save!
       report_ownership&.update!(cutoff_on: draft_cutoff_on)
@@ -50,13 +50,11 @@ module Report::Lifecycle
     with_lock do
       raise Report::NotAllowed, "not the declarant of this report" unless declarant?(user: user, tracking_code: tracking_code)
       raise Report::InvalidTransition, "cannot edit a #{status} report" unless under_analysis?
-      raise Report::InvalidTransition, "already taken in charge" if taken_in_charge?
-      raise Report::InvalidTransition, "raw content purged" if raw_content_purged?
-      raise Report::InvalidTransition, "editing window closed" unless editable_until && editable_until >= Date.current
+      raise Report::InvalidTransition, "not editable by the declarant" unless editable_by_declarant?
 
       analyzer = Report::Analyzer.new
       analyzed_text = analyzer.text_of(self)
-      assign_attributes(attrs)
+      assign_attributes(merge_answers(attrs))
       # A form sent back unchanged writes nothing.
       next unless changed_for_autosave?
       # Coded fields, casualties and free-text answers never reach the extractor: they keep the analysis.
@@ -81,6 +79,7 @@ module Report::Lifecycle
     with_lock do
       raise Report::InvalidTransition, "cannot submit from #{status}" unless open_draft?
       raise Report::InvalidTransition, "authorship link already cut" if confidential? && report_ownership.nil?
+      check_submittable!
 
       code = RecoveryCode.generate_one if anonymous?
       through_lifecycle do
@@ -153,6 +152,14 @@ module Report::Lifecycle
   end
 
   private
+    # Nothing is assigned: the report stays as it was.
+    def check_submittable!
+      errors.clear
+      errors.add(:event_type, :blank) if event_type.blank?
+      errors.add(:narrative, :blank) if narrative&.raw_text.blank?
+      raise ActiveRecord::RecordInvalid, self if errors.any?
+    end
+
     # editable_until gives away the exact submission day: it goes as soon as editing closes.
     def close_editing
       self.taken_in_charge = true
@@ -183,6 +190,26 @@ module Report::Lifecycle
         end
       end
       attrs
+    end
+
+    # A step of the form posts only its own answers: they are merged into the stored ones. A key posted
+    # blank removes its answer, a key not posted stays. Called under the row lock, on the stored values.
+    # A casualty's answers are not merged: the form posts each casualty whole, with its id.
+    def merge_answers(attrs)
+      attrs = attrs.deep_dup
+      attrs["answers"] = merged_answers(answers, attrs["answers"], scope: :report) if attrs.key?("answers")
+      narrative_attrs = attrs["narrative_attributes"]
+      if narrative_attrs&.key?("free_text_answers") && narrative_attrs["free_text_answers"].is_a?(Hash)
+        narrative_attrs["free_text_answers"] = (narrative&.free_text_answers || {}).merge(narrative_attrs["free_text_answers"])
+        narrative_attrs["free_text_answers"].reject! { |_code, answer| answer.nil? || (answer.is_a?(String) && answer.blank?) }
+      end
+      attrs
+    end
+
+    def merged_answers(stored, posted, scope:)
+      return posted unless posted.is_a?(Hash) && stored.is_a?(Hash)
+
+      taxonomy_version.cast_answers(stored.merge(posted), scope: scope)
     end
 
     def check_draft_keys!(attrs, allowed)

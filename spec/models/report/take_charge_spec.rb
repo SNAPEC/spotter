@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Report, "taking in charge", type: :model do
   before { TaxonomyVersion.import!(Rails.root.join("db/seeds/taxonomy_v0.yml")).publish! }
@@ -8,7 +9,7 @@ RSpec.describe Report, "taking in charge", type: :model do
   let(:report) do
     Report.start_draft!(mode: "confidential", user: user).first.tap do |report|
       report.save_draft!(narrative_attributes: { raw_text: "Récit fictif." })
-      report.submit!
+      submittable(report).submit!
     end
   end
 
@@ -32,8 +33,8 @@ RSpec.describe Report, "taking in charge", type: :model do
 
     it "works in each status under analysis" do
       report.take_charge!(analyst)
-      analyzing = Report.start_draft!(mode: "anonymous").first.tap { |other| other.submit!; other.start_analysis! }
-      in_validation = Report.start_draft!(mode: "anonymous").first.tap { |other| other.submit!; Report::Analyzer.new.call(other, revision: other.content_revision) }
+      analyzing = Report.start_draft!(mode: "anonymous").first.tap { |other| submittable(other).submit!; other.start_analysis! }
+      in_validation = Report.start_draft!(mode: "anonymous").first.tap { |other| submittable(other).submit!; Report::Analyzer.new.call(other, revision: other.content_revision) }
 
       [ analyzing, in_validation ].each { |other| other.take_charge!(analyst) }
 

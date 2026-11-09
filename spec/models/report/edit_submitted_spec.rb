@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Report, "#edit_submitted!", type: :model do
   include ActiveJob::TestHelper
@@ -18,7 +19,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
   def submitted(mode: "confidential")
     report, = Report.start_draft!(mode: mode, user: (user if mode == "confidential"))
     report.save_draft!(event_type: "near_miss", narrative_attributes: { raw_text: old_text })
-    code = report.submit!
+    code = submittable(report).submit!
     [ report, code ]
   end
 
@@ -249,7 +250,7 @@ RSpec.describe Report, "#edit_submitted!", type: :model do
 
     it "refuses a user whose live ownership is on another report" do
       other_report, = Report.start_draft!(mode: "confidential", user: other)
-      other_report.submit!
+      submittable(other_report).submit!
 
       expect { report.edit_submitted!(edit, user: other) }.to raise_error(Report::NotAllowed)
     end

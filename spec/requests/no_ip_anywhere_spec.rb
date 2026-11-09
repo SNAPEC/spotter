@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 # End to end: whatever path a request or a report takes, the client's IP address must end up nowhere.
 # Not covered: the Solid Queue tables, since the test adapter keeps jobs in memory, and the separate
@@ -89,10 +90,10 @@ RSpec.describe "No IP address anywhere", type: :request do
 
     report, _token = Report.start_draft!(mode: "confidential", user: declarant)
     report.save_draft!(event_type: "near_miss", narrative_attributes: { raw_text: "Récit fictif : une corde mal lovée au pied d'une voie imaginaire." })
-    report.submit!
+    submittable(report).submit!
     anonymous, token = Report.start_draft!(mode: "anonymous")
     Report.find_draft_by_token(token).save_draft!(narrative_attributes: { raw_text: "Récit fictif d'un mousqueton mal verrouillé." })
-    anonymous.reload.submit!
+    submittable(anonymous.reload).submit!
     perform_enqueued_jobs
     expect(report.reload).to be_in_validation
 

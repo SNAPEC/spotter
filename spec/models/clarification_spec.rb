@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Clarification, type: :model do
   include ActiveJob::TestHelper
@@ -11,7 +12,7 @@ RSpec.describe Clarification, type: :model do
   let(:report) do
     Report.start_draft!(mode: "confidential", user: user).first.tap do |report|
       report.save_draft!(narrative_attributes: { raw_text: "Récit fictif." })
-      report.submit!
+      submittable(report).submit!
       report.start_analysis!
       report.ready_for_validation!
     end
@@ -112,7 +113,7 @@ RSpec.describe Clarification, type: :model do
     def anonymous_with_code
       anonymous, = Report.start_draft!(mode: "anonymous")
       anonymous.save_draft!(narrative_attributes: { raw_text: "Récit fictif anonyme." })
-      code = anonymous.submit!
+      code = submittable(anonymous).submit!
       anonymous.start_analysis!
       anonymous.ready_for_validation!
       anonymous.ask_clarification!(analyst, "Question fictive ?")
@@ -135,7 +136,7 @@ RSpec.describe Clarification, type: :model do
     it "refuses a user whose live ownership is on another report" do
       other_report, = Report.start_draft!(mode: "confidential", user: other)
       other_report.save_draft!(narrative_attributes: { raw_text: "Autre récit fictif." })
-      other_report.submit!
+      submittable(other_report).submit!
       expect(Report.owned_by(other)).to eq([ other_report ])
 
       expect { report.answer_clarification!("Réponse fictive.", user: other) }.to raise_error(Report::NotAllowed)

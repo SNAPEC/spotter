@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe ClarificationMailer, type: :mailer do
   include ActiveJob::TestHelper
@@ -80,7 +81,7 @@ RSpec.describe ClarificationMailer, type: :mailer do
       analyst = User.create!(email: "chloe.bernard@example.com", role: "analyst")
       report = Report.start_draft!(mode: "confidential", user: user).first.tap do |report|
         report.save_draft!(narrative_attributes: { raw_text: "Récit fictif." })
-        report.submit!
+        submittable(report).submit!
         report.start_analysis!
         report.ready_for_validation!
         report.ask_clarification!(analyst, "Question fictive ?")

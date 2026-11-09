@@ -95,7 +95,27 @@ class TaxonomyVersion < ApplicationRecord
     end
   end
 
+  # What a browser form posts, turned into what validate_answers expects: digit strings become integers,
+  # "" or nil means "no answer" and drops the key, blank items leave a list and an empty list drops the key.
+  # Anything else is left as is, validate_answers refuses it.
+  def cast_answers(answers, scope:)
+    return answers unless answers.is_a?(Hash)
+
+    fields_by_code = fields.where(scope: scope.to_s).index_by(&:code)
+    answers.each_with_object({}) do |(code, value), cast|
+      value = cast_answer(fields_by_code[code.to_s], value)
+      cast[code] = value unless value.nil?
+    end
+  end
+
   private
+
+  def cast_answer(field, value)
+    value = value.reject { |item| item.nil? || (item.is_a?(String) && item.blank?) } if value.is_a?(Array)
+    return if value.nil? || (value.is_a?(String) || value.is_a?(Array)) && value.blank?
+
+    field&.kind == "integer" && value.is_a?(String) && value.strip.match?(/\A\d+\z/) ? value.strip.to_i : value
+  end
 
   # Only publish! may touch a published version, and only nil -> time.
   def refuse_change_if_published

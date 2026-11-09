@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/submittable")
 
 RSpec.describe RequeueStalledAnalysesJob, type: :job do
   include ActiveJob::TestHelper
@@ -9,7 +10,7 @@ RSpec.describe RequeueStalledAnalysesJob, type: :job do
   def stalled
     Report.start_draft!(mode: "anonymous").first.tap do |report|
       report.save_draft!(narrative_attributes: { raw_text: "Récit fictif d'une chute au relais." })
-      report.submit!
+      submittable(report).submit!
       clear_enqueued_jobs
     end
   end
