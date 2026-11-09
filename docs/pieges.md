@@ -16,7 +16,7 @@
 - **`report.validate!(analyst)` est la décision**, pas la validation d'ActiveModel. Pour lancer les validations : `report.valid?`.
 - **`user:` ou `tracking_code:`, jamais les deux.** Et `user: nil` pour un rapport anonyme, même si la personne est connectée.
 - **Ce qui est chiffré ne se cherche pas.** Récit, débriefs, réponses libres, fil, propositions : pas de `where`, pas de `LIKE`. Seuls l'e-mail et `user_ref` sont chiffrés de façon déterministe, pour être retrouvés par égalité.
-- **Les codes de l'analyste et le récit anonymisé passent par des méthodes.** `correct_coding!` et `write_anonymized_text!` (après la prise en charge, sous verrou, avec trace) ; `report.update(anonymized_text: …)` est refusé. Ne pas chercher le récit anonymisé non plus : il est chiffré.
+- **Les codes de l'analyste et le récit anonymisé passent par des méthodes.** `correct_coding!` et `write_anonymized_text!` (après la prise en charge, en `in_validation`, sous verrou, avec trace) ; `report.update(anonymized_text: …)` est refusé. Ne pas chercher le récit anonymisé non plus : il est chiffré.
 - **Un rapport décidé est figé.** Ses victimes, son récit, son fil et ses analyses refusent toute écriture.
 - **Les dates sont celles de Paris.** `Date.current`, jamais `Date.today` (fuseau du serveur).
 
