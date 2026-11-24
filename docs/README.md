@@ -12,4 +12,6 @@ Ordre de lecture conseillé :
 5. [Pièges](pieges.md) : ce qui a déjà mordu ou mordra.
 6. [Tests](tests.md) : comment tester un écran.
 
+À part : [Déployer](deployer.md), par la CI avec approbation, ou à la main.
+
 Les règles générales (pas de donnée réelle, pas d'IP, un rapport ne pointe jamais vers son auteur…) sont dans [`CLAUDE.md`](../CLAUDE.md) et s'appliquent partout. Le contenu métier des écrans (questions du formulaire, découpage en étapes, textes) vient des documents de conception, privés : ils ne sont pas recopiés ici.
