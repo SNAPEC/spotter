@@ -156,7 +156,7 @@ jobs:
           printf 'Host *\n  StrictHostKeyChecking yes\n' > ~/.ssh/config
           chmod 600 ~/.ssh/known_hosts ~/.ssh/config
           eval "$(ssh-agent -s -a "$RUNNER_TEMP/ssh-agent.sock")" > /dev/null
-          printf '%s\n' "$DEPLOY_SSH_KEY" | ssh-add - 2> /dev/null
+          printf '%s\n' "$DEPLOY_SSH_KEY" | ssh-add - 2> /dev/null || { echo "::error::DEPLOY_SSH_KEY is not a usable private key"; exit 1; }
           echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
           echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
 
@@ -164,14 +164,18 @@ jobs:
       - name: Write the master key
         env:
           RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
-        run: (umask 077 && printf '%s' "$RAILS_MASTER_KEY" > config/master.key)
+        run: |
+          : "${RAILS_MASTER_KEY:?RAILS_MASTER_KEY is empty}"
+          (umask 077 && printf '%s' "$RAILS_MASTER_KEY" > config/master.key)
 
       # Never with --verbose: at debug level Kamal prints the environment and the output of each command.
       - name: Deploy
         env:
           SPOTTER_SERVER_IP: ${{ secrets.SPOTTER_SERVER_IP }}
           SPOTTER_DATABASE_PASSWORD: ${{ secrets.SPOTTER_DATABASE_PASSWORD }}
-        run: bin/kamal deploy
+        run: |
+          : "${SPOTTER_SERVER_IP:?SPOTTER_SERVER_IP is empty}"
+          bin/kamal deploy
 
       - name: Remove the master key and the deploy key
         if: always()

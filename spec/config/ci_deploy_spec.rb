@@ -41,4 +41,19 @@ RSpec.describe "Deploy job of the CI workflow" do
     expect(scripts).to include("bin/kamal deploy")
     expect(scripts).not_to match(/kamal .*(-v\b|--verbose)/)
   end
+
+  it "gives each secret only to the step that needs it, and leaves no credential behind" do
+    expect(deploy).not_to have_key("env")
+    checkout = deploy["steps"].find { |step| step["uses"]&.start_with?("actions/checkout@") }
+    expect(checkout.dig("with", "persist-credentials")).to be(false)
+    cleanup = deploy["steps"].last
+    expect(cleanup["if"]).to eq("always()")
+    expect(cleanup["run"]).to include("rm -f config/master.key")
+  end
+
+  it "has no workflow that runs with secrets on behalf of a pull request" do
+    Rails.root.glob(".github/workflows/*.yml").each do |file|
+      expect(YAML.load_file(file).fetch(true).keys).not_to include("pull_request_target", "workflow_run"), file.to_s
+    end
+  end
 end
