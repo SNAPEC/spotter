@@ -64,7 +64,7 @@ builder:
 
 accessories:
   db:
-    image: postgres:17
+    image: postgres:17.11-alpine
     host: <%= server_ip %>
     # No port is published: only containers on the kamal network reach it, as spotter-db.
     env:
