@@ -1,7 +1,7 @@
 class ApplicationMailer < ActionMailer::Base
   class DeliveryFailed < StandardError; end
 
-  default from: "from@example.com"
+  default from: "Spotter <ne-pas-repondre@spotter.rosalp.fr>"
   layout "mailer"
   self.delivery_job = ApplicationMailDeliveryJob
 

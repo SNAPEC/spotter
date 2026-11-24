@@ -24,14 +24,13 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
 
-  # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  # config.assume_ssl = true
+  # kamal-proxy terminates TLS in front of the app.
+  config.assume_ssl = true
+  config.force_ssl = true
+  # kamal-proxy checks the container over plain HTTP.
+  config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
-  # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
-  # config.force_ssl = true
-
-  # Skip http-to-https redirect for the default health check endpoint.
-  # config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
+  config.session_store :cookie_store, key: "_spotter_session", secure: true, same_site: :lax
 
   # Log to STDOUT. Log tags are set in config/initializers/no_ip_logging.rb.
   config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)
@@ -56,21 +55,22 @@ Rails.application.configure do
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.
   # config.action_mailer.raise_delivery_errors = false
 
-  # Passkeys are bound to this origin: set it to the real domain before the first deploy.
-  config.x.webauthn.origin = "https://example.com"
-  config.x.webauthn.rp_id = "example.com"
+  # Passkeys are bound to this origin: moving to another domain means enrolling every passkey again.
+  config.x.webauthn.origin = "https://spotter.rosalp.fr"
+  config.x.webauthn.rp_id = "spotter.rosalp.fr"
 
-  # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: "example.com" }
+  config.action_mailer.default_url_options = { host: "spotter.rosalp.fr", protocol: "https" }
 
-  # Specify outgoing SMTP server. Remember to add smtp/* credentials via bin/rails credentials:edit.
-  # config.action_mailer.smtp_settings = {
-  #   user_name: Rails.application.credentials.dig(:smtp, :user_name),
-  #   password: Rails.application.credentials.dig(:smtp, :password),
-  #   address: "smtp.example.com",
-  #   port: 587,
-  #   authentication: :plain
-  # }
+  # Scaleway Transactional Email: the user name is the Scaleway project id, the password an API secret key.
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.smtp_settings = {
+    address: "smtp.tem.scaleway.com",
+    port: 587,
+    user_name: Rails.application.credentials.dig(:smtp, :user_name),
+    password: Rails.application.credentials.dig(:smtp, :password),
+    authentication: :plain,
+    enable_starttls: true
+  }
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).
@@ -82,12 +82,7 @@ Rails.application.configure do
   # Only use :id for inspections in production.
   config.active_record.attributes_for_inspect = [ :id ]
 
-  # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
-  # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  config.hosts = [ "spotter.rosalp.fr" ]
+  # kamal-proxy checks the container by its address, not by the domain.
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end
