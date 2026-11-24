@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_210005) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_09_220004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -22,7 +22,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_210005) do
     t.index ["report_id"], name: "index_access_logs_on_report_id"
     t.index ["user_id"], name: "index_access_logs_on_user_id"
     t.check_constraint "EXTRACT(day FROM recorded_on) = 1::numeric", name: "access_logs_recorded_on_month_check"
-    t.check_constraint "action::text = ANY (ARRAY['take_charge'::character varying, 'ask_clarification'::character varying, 'validate'::character varying, 'reject'::character varying]::text[])", name: "access_logs_action_check"
+    t.check_constraint "action::text = ANY (ARRAY['take_charge'::character varying, 'ask_clarification'::character varying, 'code'::character varying, 'validate'::character varying, 'reject'::character varying]::text[])", name: "access_logs_action_check"
   end
 
   create_table "analyses", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -32,11 +32,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_210005) do
     t.string "prompt_version", null: false
     t.string "status", default: "proposed", null: false
     t.text "proposals", null: false
-    t.text "modifications", null: false
     t.index ["report_id", "prompt_version"], name: "index_analyses_on_report_id_and_prompt_version", unique: true
     t.index ["report_id"], name: "index_analyses_on_report_id"
     t.check_constraint "provider::text = ANY (ARRAY['fake'::character varying::text, 'none'::character varying::text, 'scaleway'::character varying::text])", name: "analyses_provider_check"
-    t.check_constraint "status::text = ANY (ARRAY['proposed'::character varying::text, 'reviewed'::character varying::text, 'failed'::character varying::text])", name: "analyses_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['proposed'::character varying, 'failed'::character varying]::text[])", name: "analyses_status_check"
   end
 
   create_table "audit_events", force: :cascade do |t|
@@ -122,6 +121,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_210005) do
     t.integer "content_revision", default: 0, null: false
     t.date "editable_until"
     t.boolean "raw_content_purged", default: false, null: false
+    t.text "anonymized_text"
     t.index ["draft_expires_on"], name: "index_reports_on_draft_expires_on"
     t.index ["draft_token_digest"], name: "index_reports_on_draft_token_digest", unique: true
     t.index ["status"], name: "index_reports_on_status"

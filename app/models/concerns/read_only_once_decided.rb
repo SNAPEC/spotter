@@ -18,6 +18,6 @@ module ReadOnlyOnceDecided
     end
 
     def report_still_open
-      errors.add(:report, :invalid) if !kept_after_decision? && report_decided?
+      errors.add(:report, :invalid) if report_decided? && !kept_after_decision?
     end
 end

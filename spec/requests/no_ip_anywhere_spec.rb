@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 require Rails.root.join("spec/support/submittable")
 
 # End to end: whatever path a request or a report takes, the client's IP address must end up nowhere.
@@ -101,7 +102,7 @@ RSpec.describe "No IP address anywhere", type: :request do
     report.ask_clarification!(analyst, "Pouvez-vous préciser le type de corde ?")
     perform_enqueued_jobs { ClarificationDigestJob.perform_now }
     report.answer_clarification!("Une corde à simple de 60 mètres, fictive.", user: declarant)
-    report.validate!(analyst)
+    validate_with_text!(report, analyst)
     AccessLog.record!(user: analyst, report: report, action: "validate")
     anonymous.reject!(analyst)
 

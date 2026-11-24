@@ -1,4 +1,5 @@
 require "rails_helper"
+require Rails.root.join("spec/support/decidable")
 require Rails.root.join("spec/support/submittable")
 
 RSpec.describe Clarification, type: :model do
@@ -89,7 +90,7 @@ RSpec.describe Clarification, type: :model do
       expect { draft.ask_clarification!(analyst, "Question ?") }.to raise_error(Report::InvalidTransition)
 
       report.ask_clarification!(analyst, "Question fictive ?")
-      report.validate!(analyst)
+      validate_with_text!(report, analyst)
       expect { report.answer_clarification!("Réponse tardive.", user: user) }.to raise_error(Report::NotAllowed)
       expect { described_class.create!(report: report, author: "declarant", body: "Réponse forcée.", position: 9) }
         .to raise_error(ActiveRecord::RecordInvalid)
@@ -153,7 +154,7 @@ RSpec.describe Clarification, type: :model do
     %i[validate! reject!].each do |decision|
       it "refuses the anonymous declarant's own code after #{decision}, its digest being gone" do
         anonymous, code = anonymous_with_code
-        anonymous.public_send(decision, analyst)
+        decide_with_text!(anonymous, decision, analyst)
         expect(anonymous.reload.tracking_code_digest).to be_nil
 
         expect { anonymous.answer_clarification!("Réponse tardive.", tracking_code: code) }.to raise_error(Report::NotAllowed)

@@ -62,7 +62,8 @@ RSpec.describe Report, type: :model do
 
     it "encrypts the raw narrative, the debriefing answers, the clarifications and the user reference" do
       expect(Narrative.encrypted_attributes).to include(:raw_text, :free_text_answers, *Narrative::DEBRIEF_FIELDS.map(&:to_sym))
-      expect(Analysis.encrypted_attributes).to include(:proposals, :modifications)
+      expect(Analysis.encrypted_attributes).to include(:proposals)
+      expect(Report.encrypted_attributes).to include(:anonymized_text)
       expect(Clarification.encrypted_attributes).to include(:body)
       expect(ReportOwnership.encrypted_attributes).to include(:user_ref)
     end

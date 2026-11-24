@@ -6,6 +6,9 @@ class Report < ApplicationRecord
   DRAFT_ATTRIBUTES = %w[event_type discipline environment cause severity answers narrative_attributes casualties_attributes].freeze
   DRAFT_NARRATIVE_ATTRIBUTES = [ "raw_text", "free_text_answers", *Narrative::DEBRIEF_FIELDS ].freeze
   DRAFT_CASUALTY_ATTRIBUTES = %w[id severity answers _destroy].freeze
+  # What the analyst may correct once the report is taken in charge: the codes, not the declarant's text.
+  CODING_ATTRIBUTES = %w[event_type discipline environment cause severity answers].freeze
+  ANONYMIZED_TEXT_MAX_LENGTH = 20_000
   DRAFT_VALIDITY = 30
   MAX_CASUALTIES = 3
 
@@ -27,7 +30,11 @@ class Report < ApplicationRecord
   accepts_nested_attributes_for :narrative, update_only: true
   accepts_nested_attributes_for :casualties, allow_destroy: true
 
-  normalizes :event_type, *TAXONOMY_COLUMNS, with: ->(value) { value.presence }
+  # Written by the analyst, the only text that outlives a validation: non-deterministic, like the narrative.
+  encrypts :anonymized_text
+  normalizes :event_type, *TAXONOMY_COLUMNS, :anonymized_text, with: ->(value) { value.presence }
+  validates :anonymized_text, length: { maximum: ANONYMIZED_TEXT_MAX_LENGTH }
+  validate :anonymized_text_written_through_lifecycle
 
   validates :mode, inclusion: { in: MODES }
   validates :status, inclusion: { in: STATUSES }
@@ -141,7 +148,7 @@ class Report < ApplicationRecord
       AccessLog.record!(user: analyst, report: self, action: "ask_clarification")
       add_clarification!("analyst", body).tap do
         self.declarant_notified = false unless was_awaiting
-        close_editing
+        take_over
         save!
       end
     end
@@ -157,9 +164,39 @@ class Report < ApplicationRecord
       next if taken_in_charge?
 
       AccessLog.record!(user: analyst, report: self, action: "take_charge")
-      close_editing
+      take_over
       save!
     end
+  end
+
+  # The report carries the final codes. A field the declarant left blank starts from the extractor's
+  # proposal, and only from then on: before the take-over the declarant may still fill it, so their
+  # answers and the extractor's never mix. Called under the row lock, at the take-over and by the analyzer
+  # when its proposals arrive after it; the caller saves. An unstated proposal (nil) fills nothing.
+  # The analyst codes only once the analysis is over, so a late proposal never overwrites a correction.
+  def prefill_blanks_from(analysis)
+    return unless taken_in_charge? && under_analysis? && analysis&.status == "proposed"
+
+    proposed = analysis.proposals.to_h.filter_map { |code, proposal| [ code, proposal["value"] ] if proposal.is_a?(Hash) && !proposal["value"].nil? }.to_h
+    assign_attributes(proposed.slice(*TAXONOMY_COLUMNS).select { |code, _| self[code].blank? })
+    self.answers = answers.merge(proposed.except(*TAXONOMY_COLUMNS).select { |code, _| answers[code].blank? })
+  end
+
+  # The analyst corrects the codes of a report they took in charge, whatever came from the declarant or
+  # the extractor. Same guards and trail as the other staff actions; answers merge like a form step.
+  def correct_coding!(analyst, attrs)
+    raise Report::NotAllowed, "only active staff code a report" unless analyst&.active_staff?
+
+    attrs = attrs.to_h.deep_stringify_keys
+    check_draft_keys!(attrs, CODING_ATTRIBUTES)
+    write_as_analyst(analyst) { assign_attributes(merge_answers(attrs)) }
+  end
+
+  # The anonymised narrative, replaced whole. Blank clears it.
+  def write_anonymized_text!(analyst, text)
+    raise Report::NotAllowed, "only active staff code a report" unless analyst&.active_staff?
+
+    write_as_analyst(analyst) { self.anonymized_text = text }
   end
 
   # One mail per declarant at a fixed time, whatever the number of reports and nothing of them: the mail
@@ -212,7 +249,43 @@ class Report < ApplicationRecord
     draft_expires_on + 1
   end
 
+  # The coded answers as they stand: the four columns and the other answers, by field code.
+  def final_codes
+    TAXONOMY_COLUMNS.index_with { |column| self[column] }.merge(answers)
+  end
+
   private
+    # The block assigns; nothing is written, logged or saved when it changes nothing.
+    # Any staff action that closes editing goes through here: what is blank from then on starts from the
+    # extractor's proposal. A decision only closes editing, it never fills a field the analyst left blank.
+    def take_over
+      return if taken_in_charge?
+
+      close_editing
+      prefill_blanks_from(analyses.where(status: "proposed").order(:prompt_version).last)
+    end
+
+    def write_as_analyst(analyst)
+      with_lock do
+        # Before in_validation the extractor's proposals may still arrive and pre-fill the blanks.
+        raise Report::InvalidTransition, "cannot code a #{status} report" unless in_validation?
+        raise Report::InvalidTransition, "take the report in charge first" unless taken_in_charge?
+
+        yield
+        next unless changed_for_autosave?
+
+        AccessLog.record!(user: analyst, report: self, action: "code")
+        through_lifecycle { save! }
+      end
+    rescue ActiveRecord::RecordInvalid
+      restore_attributes
+      raise
+    end
+
+    def anonymized_text_written_through_lifecycle
+      errors.add(:anonymized_text, :invalid) if will_save_change_to_anonymized_text? && !lifecycle_transition?
+    end
+
     def declarant?(user:, tracking_code:)
       if confidential?
         user&.active? && tracking_code.nil? && ReportOwnership.live.of(user).exists?(report_id: id)

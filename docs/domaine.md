@@ -7,11 +7,11 @@
 | `User` | Un compte : e-mail, rôle (`declarant`, `analyst`, `admin`), fin d'adhésion | E-mail chiffré (déterministe, retrouvable). Aucune date de connexion. Les comptes de l'équipe sont désactivés (`deactivate!`), jamais supprimés ; ceux des déclarants inutilisés sont purgés. |
 | `Session` | Une connexion | Expire à la fin du mois suivant. Ni IP ni user agent. `passkey_verified`, `recovered` pour l'équipe. |
 | `Passkey`, `RecoveryCode` | Second facteur de l'équipe | Déjà branchés sur leurs écrans. |
-| `Report` | Le RETEX | Clé UUID, aucune date précise : seul `submitted_on` (le 1er du mois de soumission). Aucune clé vers `User`. |
+| `Report` | Le RETEX | Clé UUID, aucune date précise : seul `submitted_on` (le 1er du mois de soumission). Aucune clé vers `User`. Porte les **codes définitifs** (colonnes, `answers`) et `anonymized_text`, le récit anonymisé écrit par l'analyste (chiffré, non déterministe). |
 | `Narrative` | Récit et cinq réponses de débriefing, réponses libres de la taxonomie | Tout est chiffré et supprimé à la décision. Un seul par rapport. |
 | `Casualty` | Une personne blessée ou concernée | Gravité en colonne, le reste dans `answers` (taxonomie, portée `casualty`). Plusieurs par rapport. |
 | `ReportOwnership` | **Le seul lien** entre un rapport et son auteur | `user_ref` chiffré, date de coupure. Supprimé à la décision ou à la coupure. |
-| `Analysis` | Les propositions de l'extracteur (LLM) | Une par version de prompt. `proposals` : `{ code => { "value" => …, "excerpt" => "…" } }`, chiffré. `status` : `proposed` ou `failed` (`reviewed` existe, pas encore utilisé). |
+| `Analysis` | Les propositions de l'extracteur (LLM) | Une par version de prompt. `proposals` : `{ code => { "value" => …, "excerpt" => "…" } }`, chiffré. `status` : `proposed` ou `failed`. C'est une photo de ce que le LLM a proposé : elle ne change pas quand l'analyste corrige. `Analysis.proposal_vs_validated` la compare, champ par champ, aux codes des rapports validés (qualité du LLM). |
 | `Clarification` | Un message du fil entre analyste et déclarant | Corps chiffré, `author` (`analyst`, `declarant`), `position`. Supprimé à la décision. |
 | `TaxonomyVersion`, `TaxonomyField`, `TaxonomyOption` | La taxonomie versionnée | Une version publiée est immuable. `TaxonomyVersion.current` est la dernière publiée. |
 | `AccessLog` | Quel membre de l'équipe a agi sur quel rapport | Au mois près. Écrit par les méthodes du modèle, jamais par un contrôleur. |
@@ -45,10 +45,12 @@ Le statut ne change **que** par une méthode du cycle de vie ; un `update(status
 | Soumettre | `report.submit!` | `submitted_on` = 1er du mois, modifiable 60 jours, lien coupé à J+60. Anonyme : renvoie le **code de suivi** en clair, une seule fois. Lance l'analyse. |
 | Analyser | `AnalyzeReportJob` (automatique) | `submitted` → `analyzing` → `in_validation`, avec une `Analysis` `proposed`, ou `failed` si l'extracteur échoue (l'analyste code alors à la main). |
 | Corriger après envoi | `report.edit_submitted!(attrs, user:, tracking_code:)` | Jusqu'à la prise en charge et dans les 60 jours. Si le récit ou le débriefing change : retour à `submitted`, analyses supprimées, nouvelle analyse. Sinon, l'analyse reste. |
-| Prendre en charge | `report.take_charge!(analyst)` | Ferme la modification par le déclarant. Idempotent. |
+| Prendre en charge | `report.take_charge!(analyst)` | Ferme la modification par le déclarant, puis pré-remplit les champs restés vides avec la proposition du LLM (jamais un champ déjà rempli, jamais une valeur « non renseigné »). Une question (`ask_clarification!`) prend aussi en charge, avec le même pré-remplissage. Si l'analyse arrive après, l'analyseur le fait à son arrivée. Une décision ferme la modification sans rien pré-remplir. Idempotent. |
+| Corriger les codes | `report.correct_coding!(analyst, attrs)` | Après la prise en charge et en `in_validation` seulement (une proposition tardive n'écrase donc jamais une correction), sous verrou : `event_type`, `discipline`, `environment`, `cause`, `severity`, `answers` (fusionnés comme une étape de formulaire ; une valeur vide efface). Écrit un `AccessLog` `code` si quelque chose change. |
+| Rédiger le récit anonymisé | `report.write_anonymized_text!(analyst, text)` | Même conditions. Remplace le texte en entier ; vide l'efface. Le texte ne s'écrit que par cette méthode. |
 | Poser une question | `report.ask_clarification!(analyst, body)` | Ouvre ou poursuit le fil. Ferme aussi la modification. Aucun mail sur le moment. |
 | Répondre | `report.answer_clarification!(body, user:, tracking_code:)` | Seulement après une question de l'analyste. |
-| Décider | `report.validate!(analyst)` (depuis `in_validation`), `report.reject!(analyst)` | Purge le brut (voir plus bas), écrit l'`AccessLog`. |
+| Décider | `report.validate!(analyst)` (depuis `in_validation`), `report.reject!(analyst)` | Purge le brut (voir plus bas), écrit l'`AccessLog`. `validate!` exige le récit anonymisé (`RecordInvalid` sur `anonymized_text`), sauf si le brut a déjà été purgé à 180 jours. `reject!` efface le récit anonymisé : un rejet ne garde aucun texte. |
 
 ## Ce qui disparaît, et quand
 
@@ -63,7 +65,7 @@ Tout est automatique et identique pour tous : aucun écran ne doit permettre de 
 | Sessions expirées | Le lendemain de l'expiration | `PurgeExpiredSessionsJob` |
 | Comptes déclarants inutilisés | Jamais connecté : fin du trimestre qui suit J+30 après la création. Sinon : fin du trimestre qui suit l'expiration de la dernière session + 12 mois. Jamais tant qu'une session existe, qu'un lien d'auteur vit, ou qu'un `AccessLog` ou un `AuditEvent` cite le compte. | `PurgeUnusedAccountsJob` |
 
-Après la purge du brut, `raw_content_purged?` est vrai et il ne reste que les réponses codées. Les modèles rattachés (`Narrative`, `Clarification`, `Casualty`, `Analysis`) sont en lecture seule une fois le rapport décidé. Après 180 jours sans décision, le statut ne bouge pas : l'analyste peut encore coder à la main et décider.
+Après la purge du brut, `raw_content_purged?` est vrai et il ne reste que les réponses codées. Après une validation, seuls restent les réponses codées et le récit anonymisé de l'analyste. Le LLM ne propose pas de texte (son schéma n'a que des champs codés) ; s'il en proposait un, il ne servirait qu'à pré-remplir le champ de l'analyste et ne survivrait pas à la décision : seules les valeurs des champs codés de la taxonomie sont conservées dans `Analysis`. Les modèles rattachés (`Narrative`, `Clarification`, `Casualty`, `Analysis`) sont en lecture seule une fois le rapport décidé. Après 180 jours sans décision, le statut ne bouge pas : l'analyste peut encore coder à la main et décider.
 
 Les tâches tournent la nuit (3 h et 4 h, heure de Paris), le récapitulatif aux déclarants le lundi à 7 h (`config/recurring.yml`). En développement, rien ne tourne tout seul : lancer une tâche à la main (`bin/rails runner "CutOwnershipsJob.perform_now"`) pour voir son effet.
 
