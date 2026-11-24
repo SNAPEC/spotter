@@ -38,8 +38,9 @@ RSpec.describe "Kamal deploy configuration" do
     expect(proxy_run).not_to include("--log-opt")
   end
 
-  it "turns off Thruster request logs" do
-    expect(config.env.clear).to include("THRUSTER_LOG_REQUESTS" => false)
+  it "sends requests straight to Puma, with no Thruster logging their path" do
+    expect(config.raw_config.proxy).to include("app_port" => 3000)
+    expect(File.read(Rails.root.join("Dockerfile"))).not_to include("thrust")
   end
 
   it "pushes images through the local registry" do

@@ -12,8 +12,8 @@ servers:
 proxy:
   ssl: true
   host: spotter.rosalp.fr
-  # Thruster listens on port 80 inside the container.
-  app_port: 80
+  # Puma, with no Thruster in between (it logs the request path, magic-link token included, on a 502).
+  app_port: 3000
   healthcheck:
     path: /up
   run:
@@ -45,8 +45,6 @@ env:
     RAILS_MAX_THREADS: 3
     SOLID_QUEUE_IN_PUMA: true
     JOB_CONCURRENCY: 1
-    # Thruster logs every request with the client address.
-    THRUSTER_LOG_REQUESTS: false
 
 aliases:
   console: app exec --interactive --reuse "bin/rails console"
