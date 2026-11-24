@@ -6,6 +6,27 @@ Les écrans d'authentification (lien magique, passkey, codes de secours, déconn
 
 Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en dépend attend la méthode, il ne la remplace pas dans son contrôleur.
 
+## À construire
+
+| Écran | Pour qui | Modèle |
+| --- | --- | --- |
+| [Déclarer un RETEX](#commencer-un-retex) | Tous, sans connexion | Prêt |
+| [Mes RETEX](#mes-retex-accueil-) | Déclarant | Prêt |
+| [Formulaire en étapes](#formulaire-en-étapes) | Déclarant | Prêt |
+| [Récapitulatif et envoi](#récapitulatif-et-envoi) | Déclarant | Prêt |
+| [Saisie du code de suivi](#suivre-un-rapport-soumis) | Déclarant anonyme | Prêt |
+| [Suivi et réponse à une question](#répondre-à-une-question) | Déclarant | Prêt |
+| [Modifier après envoi](#modifier-après-envoi) | Déclarant | Prêt |
+| [File des rapports](#file-des-rapports-analyst) | Analyste | Prêt |
+| [Fiche : prendre en charge, question, valider, rejeter](#fiche-dun-rapport) | Analyste | Prêt |
+| [Fiche : corriger les codes](#fiche-dun-rapport) | Analyste | Prêt |
+| [Fiche : récit anonymisé](#fiche-dun-rapport) | Analyste | Prêt |
+| [Code d'enrôlement d'un nouveau membre](#administration-admin) | Admin | Prêt |
+| [Publier une version de taxonomie](#administration-admin) | Admin | Prêt |
+| Changer un rôle, nommer un analyste | Admin | Méthode à écrire |
+| Déclarer sa fin d'adhésion | Déclarant | Méthode à écrire |
+| Statistiques | Analyste, admin | Requête à écrire |
+
 ## Déclarant
 
 ### Mes RETEX (accueil, `/`)
@@ -27,9 +48,9 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 - Retrouver le brouillon : `Report.owned_by(Current.user).find(params[:id])` en confidentiel ; `Report.find_draft_by_token(cookies.encrypted[:draft_token])` en anonyme.
 - Afficher les champs de `report.taxonomy_version.fields`, groupés par `group`, dans l'ordre de `position`, avec `field.options` (`code`, `label`, `definition`). Composants : `components/choice_cards` (single, multi), `components/text_field`, `components/steps`.
 - Enregistrer chaque étape : `report.save_draft!(report_params)` avec le `params.expect` de [Contrôleurs](controleurs.md#paramètres). Chaque enregistrement repousse l'expiration de 30 jours.
-- **Attention :** `answers` et `free_text_answers` sont remplacés en entier à chaque enregistrement, et les champs de `answers` se répartissent sur plusieurs étapes. Une étape qui ne poste que ses propres champs efface ceux des autres. Tant que le modèle ne fusionne pas par étape (voir la fin de cette page), chaque étape doit renvoyer tout le hash, en champs cachés pour les réponses des autres étapes.
+- Chaque étape ne poste que ses propres champs : le modèle fusionne `answers` et `free_text_answers` avec ce qui est enregistré. Une clé postée vide efface sa réponse, une clé absente reste. Les valeurs arrivent en chaînes et le modèle les convertit (`"3"` devient `3`). Pas de champs cachés pour les autres étapes.
 - Récit : `narrative_attributes[raw_text]`, 20 000 caractères au plus ; chaque débrief et chaque réponse libre : 5 000.
-- Victimes : `casualties_attributes`, une entrée par personne, `_destroy` pour en retirer une.
+- Victimes : `casualties_attributes`, une entrée par personne, postée entière avec son `id`, `_destroy` pour en retirer une. Trois au plus (`Report::MAX_CASUALTIES`) : la quatrième lève `RecordInvalid` sur `casualties`. Masquer « ajouter une victime » à trois.
 - Erreurs : `RecordInvalid` → 422 avec `report.errors` (les codes de `answers` sont dans les détails de l'erreur : `"<champ>.<erreur>"`) ; `InvalidTransition` (brouillon expiré ou déjà soumis) → redirection vers Mes RETEX avec un message ; `RecordNotFound` → 404.
 
 ### Récapitulatif et envoi
@@ -38,13 +59,13 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 - `POST` : `report.submit!`.
   - Confidentiel : renvoie `nil`. Redirection vers Mes RETEX.
   - Anonyme : renvoie le **code de suivi** en clair, une seule fois. L'afficher dans la réponse même, `Cache-Control: no-store`, avec la consigne de le noter ; supprimer le cookie `draft_token`.
-- Erreur : `InvalidTransition` (brouillon expiré, déjà soumis, lien coupé) → redirection avec un message.
+- Erreurs : `RecordInvalid` (type d'événement ou récit manquant, une erreur par champ : `event_type`, `narrative`) → 422, renvoyer vers l'étape concernée ; `InvalidTransition` (brouillon expiré, déjà soumis, lien coupé) → redirection avec un message. Le reste du formulaire est facultatif.
 
 ### Suivre un rapport soumis
 
 - Confidentiel : `Report.owned_by(Current.user).find(params[:id])`.
 - Anonyme : un formulaire demande le code de suivi (`POST`, champ `tracking_code`, `rate_limit` par `IpFingerprint.for(request)`), puis `Report.find_by_tracking_code(params[:tracking_code])`. Code faux → même message que « introuvable ». La page affichée porte `Cache-Control: no-store` et garde le code dans un champ caché des formulaires qui suivent (réponse, modification) : il n'est stocké nulle part ailleurs.
-- Afficher : `status`, `report.clarifications` (dans l'ordre, `author` et `body`), le formulaire de réponse si `awaiting_clarification?`, le lien de modification si le rapport est encore modifiable.
+- Afficher : `status`, `report.clarifications` (dans l'ordre, `author` et `body`), le formulaire de réponse si `awaiting_clarification?`, le lien de modification si `report.editable_by_declarant?`.
 - Le rapport devient introuvable pour le déclarant : en confidentiel à la décision ou 60 jours après la soumission (le lien est coupé), en anonyme à la décision ou à la purge des 180 jours (le code de suivi est effacé). La page de saisie du code doit le dire, pour qu'un code « qui ne marche plus » ne passe pas pour une erreur.
 
 ### Répondre à une question
@@ -95,14 +116,7 @@ Ce que le modèle ne fournit pas encore est listé à la fin : un écran qui en 
 
 À trancher avec Hugo avant l'écran concerné.
 
-1. **Le codage par l'analyste** : fait. Le rapport porte les codes définitifs. À la prise en charge, les champs restés vides sont pré-remplis avec la proposition du LLM ; ensuite `report.correct_coding!(Current.user, attrs)` corrige les colonnes et les `answers` (sous verrou, après la prise en charge, en `in_validation`, avec trace `code`). `Analysis` reste la photo des propositions ; `Analysis.proposal_vs_validated` donne la comparaison proposition / code validé, sans écran. `Analysis#modifications` et le statut `reviewed` n'existent plus.
-2. **Le récit anonymisé** : fait. `report.write_anonymized_text!(Current.user, text)` (même conditions) ; `validate!` l'exige, sauf si le récit brut a été purgé à 180 jours ; `reject!` l'efface. Le LLM ne propose aucun texte : le champ de l'écran part vide, ou avec le texte déjà enregistré.
-3. **Les valeurs du formulaire.** Un formulaire envoie des chaînes : un champ `integer` arrive en `"3"`, refusé (`not_an_integer`) ; un choix laissé vide arrive en `""`, refusé (`invalid_option`). Il faut convertir et nettoyer dans le modèle avant la validation.
-4. **« Encore modifiable ? »** Pas de prédicat pour afficher ou non le lien de modification. La condition est dans `edit_submitted!` ; une méthode publique du modèle doit la porter, pas la vue.
-5. **Un brouillon complet.** `submit!` accepte un brouillon vide. Décidé : seuls le type d'événement et un récit non vide seront obligatoires ; `submit!` refusera sinon, avec une erreur par champ (méthode à venir).
-6. **Le nombre de victimes.** Aucune limite aujourd'hui. Décidé : trois au plus, le modèle refusera la quatrième ; l'écran peut masquer « ajouter une victime » à trois (validation à venir).
-7. **La fin d'adhésion** déclarée par le moniteur : aucune méthode.
-8. **Changer un rôle**, nommer un analyste : aucune méthode (la règle des deux admins est déjà dans la validation de `User`).
-9. **Les statistiques** : aucune requête.
-10. **L'enregistrement par étape.** `save_draft!` remplace `answers` et `free_text_answers` en entier ; une fusion par étape dans le modèle éviterait de renvoyer tout le hash à chaque étape.
-11. **« Le déclarant peut-il encore répondre ? »** Volontairement sans réponse par rapport : en confidentiel, la réponse bascule le jour exact de la coupure, soit 60 jours après la soumission, et un écran de l'équipe qui l'afficherait donnerait le jour d'envoi. L'écran analyste affiche une mention générale, la même pour tous les rapports, et ne lit jamais `ReportOwnership`.
+1. **La fin d'adhésion** déclarée par le moniteur : aucune méthode.
+2. **Changer un rôle**, nommer un analyste : aucune méthode (la règle des deux admins est déjà dans la validation de `User`).
+3. **Les statistiques** : aucune requête.
+4. **« Le déclarant peut-il encore répondre ? »** Volontairement sans réponse par rapport : en confidentiel, la réponse bascule le jour exact de la coupure, soit 60 jours après la soumission, et un écran de l'équipe qui l'afficherait donnerait le jour d'envoi. L'écran analyste affiche une mention générale, la même pour tous les rapports, et ne lit jamais `ReportOwnership`.
