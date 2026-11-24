@@ -15,17 +15,20 @@
 default: &default
   adapter: postgresql
   encoding: unicode
-  host: <%= ENV.fetch("DATABASE_HOST", "127.0.0.1") %>
-  port: <%= ENV.fetch("DATABASE_PORT", 5432) %>
-  username: <%= ENV.fetch("DATABASE_USERNAME", "spotter") %>
-  password: <%= ENV.fetch("DATABASE_PASSWORD", "spotter") %>
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
   max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
 
+# The local PostgreSQL of bin/setup. Production has none of these defaults.
+local: &local
+  <<: *default
+  host: <%= ENV.fetch("DATABASE_HOST", "127.0.0.1") %>
+  port: <%= ENV.fetch("DATABASE_PORT", 5432) %>
+  username: <%= ENV.fetch("DATABASE_USERNAME", "spotter") %>
+  password: <%= ENV.fetch("DATABASE_PASSWORD", "spotter") %>
 
 development:
-  <<: *default
+  <<: *local
   database: spotter_development
 
   # The specified database role being used to connect to PostgreSQL.
@@ -59,7 +62,7 @@ development:
 # re-generated from your development database when you run "rake".
 # Do not set this db to the same as development or production.
 test:
-  <<: *default
+  <<: *local
   database: spotter_test
 
 # As with config/credentials.yml, you never want to store sensitive information,
@@ -91,6 +94,8 @@ test:
 production:
   primary: &primary_production
     <<: *default
+    # The PostgreSQL accessory of config/deploy.yml, reached over the private Kamal network.
+    host: spotter-db
     database: spotter_production
     username: spotter
     password: <%= ENV["SPOTTER_DATABASE_PASSWORD"] %>
