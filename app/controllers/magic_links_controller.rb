@@ -10,11 +10,11 @@ class MagicLinksController < ApplicationController
   # it creates nothing, and must keep showing its validation error.
   rate_limit to: 3, within: 1.hour, only: :create, name: "email_client", if: :email_limitable?,
     by: -> { "#{User.email_fingerprint(params[:email])}:#{IpFingerprint.for(request)}" },
-    with: -> { render :create },
+    with: -> { redirect_to login_sent_path },
     store: Rails.configuration.x.rate_limit_store || cache_store
   rate_limit to: 10, within: 6.hours, only: :create, name: "email", if: :email_limitable?,
     by: -> { User.email_fingerprint(params[:email]) },
-    with: -> { render :create },
+    with: -> { redirect_to login_sent_path },
     store: Rails.configuration.x.rate_limit_store || cache_store
 
   def new
@@ -23,12 +23,16 @@ class MagicLinksController < ApplicationController
   def create
     @user = User.send_magic_link(params[:email].to_s)
 
+    # Turbo only follows a form answered by a redirect: the confirmation is a page of its own.
     if @user.persisted?
-      render :create
+      redirect_to login_sent_path
     else
       flash.now[:alert] = t(".invalid_email")
       render :new, status: :unprocessable_entity
     end
+  end
+
+  def sent
   end
 
   def show

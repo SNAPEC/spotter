@@ -35,10 +35,11 @@ fr:
       email: "Adresse e-mail"
       submit: "Recevoir un lien de connexion"
     create:
-      title: "Vérifiez votre boîte de réception"
-      body: "Si l’adresse est valide, un lien de connexion vient d’y être envoyé. Il est valable 15 minutes."
       invalid_email: "Cette adresse e-mail n’est pas valide."
       too_many_requests: "Trop de demandes. Réessayez dans quelques minutes."
+    sent:
+      title: "Vérifiez votre boîte de réception"
+      body: "Si l’adresse est valide, un lien de connexion vient d’y être envoyé. Il est valable 15 minutes."
     show:
       title: "Connexion"
       body: "Confirmez la connexion à Spotter."

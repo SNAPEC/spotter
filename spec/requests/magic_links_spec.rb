@@ -38,6 +38,15 @@ RSpec.describe "Magic link sign-in", type: :request do
     expect(response.body).to include("Recevoir un lien de connexion")
   end
 
+  it "answers the form with a redirect, which Turbo requires, to a confirmation that writes nothing" do
+    request_link("lea.martin@example.com")
+    expect(response).to redirect_to(login_sent_path)
+
+    expect { get login_sent_path }.not_to change(User, :count)
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Vérifiez votre boîte")
+  end
+
   it "signs a known user in through the emailed link" do
     request_link("lea.martin@example.com")
     path = link_path_from_last_email
@@ -75,6 +84,8 @@ RSpec.describe "Magic link sign-in", type: :request do
 
     expect { request_link("nouveau@example.com") }.to change(User, :count).by(1)
     expect(answer).to eq(known)
+    expect(response).to redirect_to(login_sent_path)
+    follow_redirect!
     expect(response.body).to include("Vérifiez votre boîte")
     expect(ActionMailer::Base.deliveries.last.to).to eq([ "nouveau@example.com" ])
     expect(User.find_by(email: "nouveau@example.com")).to have_attributes(role: "declarant")
@@ -134,18 +145,18 @@ RSpec.describe "Magic link sign-in", type: :request do
 
     it "allows 5 requests in 3 minutes per client, then answers 429" do
       5.times { |n| request_link("personne#{n}@example.com") }
-      expect(response).to have_http_status(:ok)
+      expect(response).to redirect_to(login_sent_path)
 
       request_link("personne5@example.com")
       expect(response).to have_http_status(:too_many_requests)
       expect(response.body).to include("Trop de demandes")
 
       request_link("personne6@example.com", env: { "REMOTE_ADDR" => "203.0.113.8" })
-      expect(response).to have_http_status(:ok)
+      expect(response).to redirect_to(login_sent_path)
 
       travel 3.minutes + 1.second do
         request_link("personne7@example.com")
-        expect(response).to have_http_status(:ok)
+        expect(response).to redirect_to(login_sent_path)
       end
     end
 
