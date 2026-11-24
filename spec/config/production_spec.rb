@@ -14,7 +14,6 @@ RSpec.describe "Production configuration" do
       hosts: config.hosts.map(&:to_s),
       assume_ssl: config.assume_ssl,
       force_ssl: config.force_ssl,
-      session: config.session_options.slice(:secure, :same_site),
       webauthn: [ WebAuthn.configuration.allowed_origins, WebAuthn.configuration.rp_id ],
       url_options: config.action_mailer.default_url_options,
       delivery_method: config.action_mailer.delivery_method,
@@ -40,7 +39,6 @@ RSpec.describe "Production configuration" do
   it "serves the app over HTTPS on its domain only, the health check from any host" do
     expect(production).to include(
       hosts: [ "spotter.rosalp.fr" ], assume_ssl: true, force_ssl: true,
-      session: { secure: true, same_site: "lax" },
       on_domain: [ 200, nil, true ],
       foreign_host: [ 403, nil, false ],
       health_check: [ 200, nil, true ]

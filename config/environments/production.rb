@@ -30,8 +30,6 @@ Rails.application.configure do
   # kamal-proxy checks the container over plain HTTP.
   config.ssl_options = { redirect: { exclude: ->(request) { request.path == "/up" } } }
 
-  config.session_store :cookie_store, key: "_spotter_session", secure: true, same_site: :lax
-
   # Log to STDOUT. Log tags are set in config/initializers/no_ip_logging.rb.
   config.logger   = ActiveSupport::TaggedLogging.logger(STDOUT)
 
