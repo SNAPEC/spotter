@@ -4,11 +4,11 @@ La production tourne sur une seule machine virtuelle Scaleway, déployée avec K
 
 ## Automatiquement, depuis la CI
 
-Chaque push sur `main` (donc chaque pull request fusionnée) lance le job `deploy` du workflow `CI`, une fois les autres jobs du même workflow au vert. Le job attend ensuite l'approbation d'un relecteur de l'environnement GitHub `production` : Actions, le run, « Review deployments ». Sans approbation, rien ne part.
+Chaque push sur `main` (donc chaque pull request fusionnée) lance le job `deploy` du workflow `CI`, une fois les autres jobs du même workflow au vert. Le job attend ensuite l'approbation d'un relecteur de l'environnement GitHub `production` : Actions, le run, « Review deployments ». Sans approbation, rien ne part : l'environnement n'autorise aucun contournement, même pour un admin de l'organisation.
 
-- Deux déploiements ne se chevauchent jamais : un push arrivé pendant un déploiement attend la fin du premier.
+- Deux déploiements ne se chevauchent jamais : un push arrivé pendant un déploiement attend la fin du premier. GitHub ne garde qu'un seul déploiement en attente : si un troisième push arrive, il remplace le deuxième, et seul le plus récent part.
 - Une pull request, même d'un fork, ne déploie jamais : le job ne tourne que sur `main`, et l'environnement `production` n'accepte que cette branche.
-- Les secrets sont ceux de l'environnement `production` : `RAILS_MASTER_KEY`, `SPOTTER_DATABASE_PASSWORD`, `SPOTTER_SERVER_IP`, `DEPLOY_SSH_KEY` (clé privée dédiée au déploiement) et `DEPLOY_KNOWN_HOSTS` (la ligne de clé d'hôte du serveur, la seule acceptée).
+- Les secrets sont ceux de l'environnement `production` : `RAILS_MASTER_KEY`, `SPOTTER_DATABASE_PASSWORD`, `SPOTTER_SERVER_IP`, `DEPLOY_SSH_KEY` (clé privée dédiée au déploiement) et `DEPLOY_KNOWN_HOSTS` (la ligne de clé d'hôte du serveur, la seule acceptée ; elle doit porter l'adresse IP, pas le nom de domaine, puisque Kamal se connecte à l'IP : `ssh-keyscan -t ed25519 <ip>`, empreinte comparée avant de l'enregistrer).
 - Les logs d'Actions sont publics. Ne jamais ajouter `--verbose` à `kamal` dans le workflow : à ce niveau, Kamal affiche l'environnement de chaque commande, secrets compris. L'adresse du serveur est masquée.
 
 ## À la main
@@ -22,3 +22,12 @@ bin/kamal deploy
 ```
 
 Le hook `pre-connect` refuse de continuer si `SPOTTER_DATABASE_PASSWORD` n'est pas exporté. Le verrou de Kamal empêche un déploiement manuel de croiser celui de la CI.
+
+## Verrou resté en place
+
+Un déploiement interrompu (job annulé, délai de 30 minutes dépassé, coupure réseau) laisse le verrou de Kamal sur le serveur : tous les suivants échouent sur « Deploy lock found ». Vérifier d'abord qu'aucun déploiement ne tourne (Actions, et personne à la main), puis, depuis un poste qui a les exports ci-dessus :
+
+```sh
+bin/kamal lock status
+bin/kamal lock release
+```
