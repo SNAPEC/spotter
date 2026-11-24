@@ -104,3 +104,81 @@ jobs:
 
       - name: Run the tests
         run: bin/rspec
+
+  # In this workflow rather than one started by workflow_run: a pull request, from a fork or not, runs
+  # its own copy of this file, without the secrets of the production environment, whose branch policy
+  # only lets main in. workflow_run would start a privileged run for the CI of every pull request and
+  # rest on an `if` alone.
+  deploy:
+    needs: [ scan_ruby, scan_js, lint, test ]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The environment has a required reviewer: each deploy waits for a manual approval.
+    environment:
+      name: production
+      url: https://spotter.rosalp.fr
+    # Never two deploys at once; a newer push waits instead of cutting one short.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+
+    steps:
+      # GitHub masks secrets already: this also covers the dashed form a reverse DNS name would use.
+      - name: Mask the server address
+        env:
+          SPOTTER_SERVER_IP: ${{ secrets.SPOTTER_SERVER_IP }}
+        run: |
+          echo "::add-mask::${SPOTTER_SERVER_IP}"
+          echo "::add-mask::${SPOTTER_SERVER_IP//./-}"
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@be3c7df29b3349ec6bcfc6b4792f1cf9f5237d18 # v1.343.0
+        with:
+          bundler-cache: true
+
+      # net-ssh, under Kamal, accepts an unknown host key by default: StrictHostKeyChecking makes it
+      # check the key against the pinned line only. ssh-add is silenced: it prints the key comment.
+      - name: Load the deploy key and pin the server host key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host *\n  StrictHostKeyChecking yes\n' > ~/.ssh/config
+          chmod 600 ~/.ssh/known_hosts ~/.ssh/config
+          eval "$(ssh-agent -s -a "$RUNNER_TEMP/ssh-agent.sock")" > /dev/null
+          printf '%s\n' "$DEPLOY_SSH_KEY" | ssh-add - 2> /dev/null || { echo "::error::DEPLOY_SSH_KEY is not a usable private key"; exit 1; }
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      # Ignored by git and by Docker: Kamal builds the image from a clone of the commit, without it.
+      - name: Write the master key
+        env:
+          RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+        run: |
+          : "${RAILS_MASTER_KEY:?RAILS_MASTER_KEY is empty}"
+          (umask 077 && printf '%s' "$RAILS_MASTER_KEY" > config/master.key)
+
+      # Never with --verbose: at debug level Kamal prints the environment and the output of each command.
+      - name: Deploy
+        env:
+          SPOTTER_SERVER_IP: ${{ secrets.SPOTTER_SERVER_IP }}
+          SPOTTER_DATABASE_PASSWORD: ${{ secrets.SPOTTER_DATABASE_PASSWORD }}
+        run: |
+          : "${SPOTTER_SERVER_IP:?SPOTTER_SERVER_IP is empty}"
+          bin/kamal deploy
+
+      - name: Remove the master key and the deploy key
+        if: always()
+        run: |
+          rm -f config/master.key
+          ssh-agent -k > /dev/null 2>&1 || true
