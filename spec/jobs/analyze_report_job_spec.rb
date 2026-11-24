@@ -93,6 +93,8 @@ RSpec.describe AnalyzeReportJob, type: :job do
     end
 
     it "gives an unavailable extractor about an hour, then hands the report over without error, once" do
+      # travel_to drops sub-seconds: starting on a whole second keeps the first gap from losing up to one.
+      travel_to Time.current.change(usec: 0)
       use_extractor { |text| raise Timeout::Error, "upstream echoed: #{text}" }
       submittable(report).submit!
 
