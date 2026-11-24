@@ -40,6 +40,8 @@ module Spotter
     # Its routes serve and accept files without authentication. Files will go through our own authorised
     # controllers.
     config.active_storage.draw_routes = false
+    # No image variant yet: image_processing and libvips come back with the first attachment (EXIF stripping).
+    config.active_storage.variant_processor = :disabled
 
     # A finished job row keeps its arguments, a user's GlobalID among them, and the time it ran: it would
     # date a mail in the provider's log. Deleted as soon as the job has run, in every environment.
