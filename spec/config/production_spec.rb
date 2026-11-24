@@ -58,7 +58,7 @@ RSpec.describe "Production configuration" do
   it "sends mail through Scaleway Transactional Email over STARTTLS" do
     expect(production).to include(
       delivery_method: "smtp",
-      smtp: { address: "smtp.tem.scaleway.com", port: 587, enable_starttls: true }
+      smtp: { address: "smtp.tem.scaleway.com", port: 2587, enable_starttls: true }
     )
   end
 end

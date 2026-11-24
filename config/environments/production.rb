@@ -62,10 +62,11 @@ Rails.application.configure do
   config.action_mailer.default_url_options = { host: "spotter.rosalp.fr", protocol: "https" }
 
   # Scaleway Transactional Email: the user name is the Scaleway project id, the password an API secret key.
+  # Port 2587: Scaleway blocks outgoing SMTP on the usual ports of an instance.
   config.action_mailer.delivery_method = :smtp
   config.action_mailer.smtp_settings = {
     address: "smtp.tem.scaleway.com",
-    port: 587,
+    port: 2587,
     user_name: Rails.application.credentials.dig(:smtp, :user_name),
     password: Rails.application.credentials.dig(:smtp, :password),
     authentication: :plain,
