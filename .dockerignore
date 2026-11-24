@@ -49,3 +49,17 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Ignore what a production image never runs or reads
+/.claude
+/.githooks
+/.kamal
+/docs
+/spec
+/script
+/scripts
+/.rspec
+/.rubocop.yml
+/CONTRIBUTING.md
+/README.md
+/SECURITY.md
