@@ -4,7 +4,7 @@ La production tourne sur une seule machine virtuelle Scaleway, déployée avec K
 
 ## Automatiquement, depuis la CI
 
-Chaque push sur `main` (donc chaque pull request fusionnée) lance le job `deploy` du workflow `CI`, une fois les autres jobs du même workflow au vert. Le job attend ensuite l'approbation d'un relecteur de l'environnement GitHub `production` : Actions, le run, « Review deployments ». Sans approbation, rien ne part : l'environnement n'autorise aucun contournement, même pour un admin de l'organisation.
+Chaque push sur `main` (donc chaque pull request fusionnée) lance le job `deploy` du workflow `CI`, une fois les autres jobs du même workflow au vert. Le déploiement part alors tout seul, sans approbation : la relecture de la pull request est le seul contrôle humain. L'environnement GitHub `production` porte les secrets et n'accepte que `main`.
 
 - Deux déploiements ne se chevauchent jamais : un push arrivé pendant un déploiement attend la fin du premier. GitHub ne garde qu'un seul déploiement en attente : si un troisième push arrive, il remplace le deuxième, et seul le plus récent part.
 - Une pull request, même d'un fork, ne déploie jamais : le job ne tourne que sur `main`, et l'environnement `production` n'accepte que cette branche.

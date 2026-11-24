@@ -19,7 +19,7 @@ RSpec.describe "Deploy job of the CI workflow" do
     expect(deploy["needs"]).to match_array(workflow["jobs"].keys - [ "deploy" ])
   end
 
-  it "goes through the approved production environment, one deploy at a time" do
+  it "goes through the production environment, one deploy at a time" do
     expect(deploy.dig("environment", "name")).to eq("production")
     expect(deploy["concurrency"]).to include("cancel-in-progress" => false)
     expect(deploy["permissions"]).to eq("contents" => "read")

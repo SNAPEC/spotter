@@ -114,7 +114,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # The environment has a required reviewer: each deploy waits for a manual approval.
+    # The environment holds the production secrets and only accepts main: a merged pull request deploys itself.
     environment:
       name: production
       url: https://spotter.rosalp.fr
