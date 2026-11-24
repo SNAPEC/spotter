@@ -1,0 +1,4 @@
+#!/bin/sh
+# .kamal/secrets reads the database password from the shell: an unset variable would reach the app and
+# the PostgreSQL accessory as an empty password, and fail late, on the server.
+: "${SPOTTER_DATABASE_PASSWORD:?export it, from the password manager, before running kamal}"
