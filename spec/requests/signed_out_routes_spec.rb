@@ -7,6 +7,7 @@ RSpec.describe "Routes for a signed-out visitor", type: :request do
   OPEN_ROUTES = {
     "GET /login" => "sign-in form",
     "POST /login" => "asks for a magic link",
+    "GET /login/sent" => "magic link requested: a static confirmation, no data",
     "GET /login/:token" => "magic link confirmation",
     "POST /login/:token" => "magic link consumption",
     "GET /up" => "health check, no data",

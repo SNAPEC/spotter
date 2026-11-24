@@ -1,6 +1,8 @@
 Rails.application.routes.draw do
   get "login" => "magic_links#new", as: :login
   post "login" => "magic_links#create"
+  # Before login/:token, which would take "sent" for a token.
+  get "login/sent" => "magic_links#sent", as: :login_sent
   # The GET only shows a confirmation button: mail scanners that prefetch links must not burn them.
   get "login/:token" => "magic_links#show", as: :magic_link
   post "login/:token" => "magic_links#consume"

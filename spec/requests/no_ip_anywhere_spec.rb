@@ -36,7 +36,8 @@ RSpec.describe "No IP address anywhere", type: :request do
 
   def sign_in_over_http(email)
     post login_path, params: { email: email }, env: env
-    expect(response).to have_http_status(:ok)
+    expect(response).to redirect_to(login_sent_path)
+    get login_sent_path, env: env
     perform_enqueued_jobs
     path = URI(ActionMailer::Base.deliveries.last.text_part.body.decoded[%r{http://\S+/login/\S+}]).path
     get path, env: env
