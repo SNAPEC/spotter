@@ -22,8 +22,13 @@ grep -Eq 'git[[:space:]]+add[[:space:]]+(-N|--intent-to-add|-A|--all|\.([[:space
 grep -Eq 'git[[:space:]]+stash' <<<"$cmd" && block "git stash is not allowed: the working tree is shared."
 grep -Eq 'git[[:space:]]+reset[[:space:]]+.*--hard' <<<"$cmd" && block "git reset --hard is not allowed."
 grep -Eq 'git[[:space:]]+(checkout|restore)[[:space:]]+(--[[:space:]]+)?\.([[:space:]]|$)' <<<"$cmd" && block "discarding all working-tree changes is not allowed."
-grep -Eq 'git[[:space:]]+push([[:space:]].*)?[[:space:]](main|master)([[:space:]]|$)' <<<"$cmd" && block "never push to main: open a pull request."
-grep -Eq 'git[[:space:]]+push([[:space:]].*)?[[:space:]](-f|--force)([[:space:]]|$)' <<<"$cmd" && block "force push is not allowed (use --force-with-lease on your own branch, and ask first)."
+# The private steering repo has no pull requests: only `git -C <path>/spotter-pilotage push` may target its main.
+push='git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+push'
+if grep -Eq "$push"'([[:space:]].*)?[[:space:]](main|master)([[:space:]]|$)' <<<"$cmd" &&
+   ! grep -Eq '^git[[:space:]]+-C[[:space:]]+[^[:space:];&|]*/spotter-pilotage/?[[:space:]]+push[[:space:]][^;&|]*$' <<<"$cmd"; then
+  block "never push to main: open a pull request."
+fi
+grep -Eq "$push"'([[:space:]].*)?[[:space:]](-f|--force)([[:space:]]|$)' <<<"$cmd" && block "force push is not allowed (use --force-with-lease on your own branch, and ask first)."
 
 # Database: destructive tasks only in the test environment.
 if grep -Eq 'db:(drop|reset|rollback|purge|schema:load|truncate_all|migrate:reset|seed:replant)' <<<"$cmd" &&
